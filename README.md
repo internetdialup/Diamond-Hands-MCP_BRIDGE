@@ -25,7 +25,11 @@ Running - this Repo is to go with a Regime Analysis + Expectancy. Secondary to t
 - `workflows/` holds delivery and documentation patterns.
 - `docs/context-orientation.md` is the active repo Knob log.
 
-Execution and live order-routing work belong in the companion `Trading-MCP-Algo` repository unless a task is explicitly analysis-only.
+Execution and live order-routing work belong in the companion `Trading-MCP-Algo` repository unless a task is explicitly analysis-only. 
+
+## Connect to your own MCP Algo Repo
+
+It's best to fork this and create your own MCP Algo Repo :) This is my personal experiment. You've been warned. The "house always wins".
 
 ## Cold Start
 
