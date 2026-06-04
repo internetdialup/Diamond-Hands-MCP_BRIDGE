@@ -6,12 +6,10 @@ Trading research and analysis workspace bootstrapped from the `Documentation.md`
 
 This repository is for market analysis work: data ingestion, indicator research, hypothesis testing, trade review, and documentation around what signals are worth operationalizing.
 
-## Cold Start
-
-Agents and contributors should start with `AGENT.md`, then read `behavior/`, then `docs/context-orientation.md`, then pull in `skills/` and `workflows/` as the task requires.
 
 ## Working Focus
 
+- Connecting MCP to Trade Buy / Sell 💎🤝📊
 - Market data collection and normalization
 - Indicator and feature analysis
 - Strategy evaluation before execution work
@@ -26,3 +24,7 @@ Agents and contributors should start with `AGENT.md`, then read `behavior/`, the
 - `docs/context-orientation.md` is the active repo Knob log.
 
 Execution and live order-routing work belong in the companion `Trading-MCP-Algo` repository unless a task is explicitly analysis-only.
+
+## Cold Start
+
+Agents and contributors should start with `AGENT.md`, then read `behavior/`, then `docs/context-orientation.md`, then pull in `skills/` and `workflows/` as the task requires.
