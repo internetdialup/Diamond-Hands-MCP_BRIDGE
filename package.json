@@ -1,0 +1,7 @@
+{
+  "name": "diamond-hands-mcp-bridge",
+  "private": true,
+  "scripts": {
+    "diamondhands": "PYTHONPATH=src python3 main.py"
+  }
+}

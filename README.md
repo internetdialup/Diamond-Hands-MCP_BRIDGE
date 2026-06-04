@@ -25,10 +25,62 @@ The public CLI explains the Robinhood onboarding path and then helps the user at
 
 ## Single Public CLI
 
-Run the public Diamond Hands bridge from this repo:
+Use the terminal CLI as the primary way to start Diamond Hands.
+
+Install the editable package:
 
 ```bash
-PYTHONPATH=src python3 main.py --config config/markets.example.yaml
+pip install -e .
+```
+
+Start the CLI:
+
+```bash
+diamondhands
+```
+
+This opens the interactive Diamond Hands shell in your terminal. The prompt is:
+
+```text
+diamond-hands>
+```
+
+### Terminal CLI Walkthrough
+
+When the shell opens, you can type `/commands` at any time to reopen the command desk and see the available slash commands.
+
+Primary interactive commands:
+
+```text
+/commands      Show the command desk
+/todaysupdate  Show the market desk and top 10 events
+/analyze       Run the full Diamond Hands daily analysis
+/verifybridge  Check private ALGO bridge compatibility
+/handoff       Send the current artifact to Diamond-Hands-Algo
+/quit          Exit the DH CLI session
+```
+
+Supported aliases:
+
+```text
+/help           -> /commands
+/today-status   -> /todaysupdate
+/verify-bridge  -> /verifybridge
+/hand-off       -> /handoff
+quit            -> /quit
+exit            -> /quit
+```
+
+Alternative entrypoints:
+
+```bash
+npm run diamondhands
+```
+
+Fallback dev entrypoint:
+
+```bash
+PYTHONPATH=src python3 main.py
 ```
 
 Useful modes:
@@ -60,9 +112,23 @@ Users are expected to:
 3. connect their agent to Robinhood Agentic Trading
 4. use the public bridge output as the input to their private execution stack
 
+## TL;DR & ELI5 (The "Recipe Robot")
+
+### TL;DR
+This project is a **public market intelligence engine**. It analyzes market data and identifies trading setups, then packages its findings into a machine-readable artifact for a **private** repository to execute. It provides the analysis but never manages your money or keys.
+
+### ELI5 (How it Works)
+Imagine you have two robots working together to bake cookies:
+
+1.  **The Recipe Robot (This Project):** This robot's only job is to look at the ingredients in the pantry (market data), read the cookbook (technical indicators), and figure out the perfect recipe for today. It writes the recipe down on a card and hands it off. It *never* touches the oven.
+2.  **The Chef Robot (Your Private Repo):** This robot takes that recipe card, checks if it's safe (risk rules), and then actually puts the cookies in the oven (makes the trades on Robinhood).
+
+By keeping the **Recipe Robot** public, you can share the "math" with the community without ever risking your secret passwords or personal money rules.
+
 ## Key Docs
 
 - `Documentation.md` for the bridge contract and product boundary
 - `docs/robinhood-agentic-trading.md` for Robinhood MCP onboarding
 - `docs/private-algo-bridge.md` for attaching the user’s private ALGO repo
 - `docs/context-orientation.md` for the latest state of the bridge
+- `scripts/learn_diamondhands_cli.py` for a commented demo of the CLI strings, animation, and command map

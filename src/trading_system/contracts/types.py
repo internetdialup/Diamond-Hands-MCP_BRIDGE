@@ -1,6 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+
+@dataclass
+class NewsItem:
+    topic: str
+    sentiment_score: float
+    summary: str
+
+
+@dataclass
+class TimeseriesPoint:
+    date: str
+    close: float
+
 from typing import Any
 
 
@@ -73,6 +86,8 @@ class DailyReportContract:
     confidence_drivers: list[str]
     symbols: list[SymbolReport]
     downstream_handoff: list[HandoffContract]
+    top_12_news: list[NewsItem] = field(default_factory=list)
+    market_timeseries: dict[str, list[TimeseriesPoint]] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

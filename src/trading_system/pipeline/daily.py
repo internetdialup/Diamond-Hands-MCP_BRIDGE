@@ -10,13 +10,15 @@ from trading_system.contracts.types import (
     FlowContract,
     HandoffContract,
     MarketRegimeContract,
+    NewsItem,
+    TimeseriesPoint,
     SymbolReport,
 )
 from trading_system.data.providers import build_data_provider
 from trading_system.features.flow import build_flow_contract
 from trading_system.features.regime import classify_market_regime
 from trading_system.features.sentiment import build_sentiment_contract
-from trading_system.features.technical import atr, macd, momentum_score, realized_volatility, rsi
+from trading_system.features.technical import atr, bollinger_pct_b, macd, momentum_score, realized_volatility, rsi
 from trading_system.models.fusion import direction_bias_from_pattern, fuse_confidence, technical_posture_from_scores
 from trading_system.models.pattern import classify_pattern
 
@@ -42,6 +44,14 @@ class DailyPipeline:
         confidence_drivers: list[str] = []
         no_trade_flags: list[str] = []
 
+        
+        market_timeseries: dict[str, list[TimeseriesPoint]] = {}
+        # Collect benchmark timeseries
+        market_timeseries[self.config.universe.benchmark] = [
+            TimeseriesPoint(date=f'D{i}', close=b.close) 
+            for i, b in enumerate(snapshot.benchmark_bars[-20:])
+        ]
+
         for symbol in self.config.universe.symbols:
             symbol_snapshot = snapshot.symbols[symbol]
             sentiment_contract = build_sentiment_contract(symbol, symbol_snapshot.sentiment)
@@ -49,6 +59,7 @@ class DailyPipeline:
             pattern_contract = classify_pattern(symbol_snapshot)
 
             current_rsi = rsi(symbol_snapshot.bars)
+            bb_pct_b = bollinger_pct_b(symbol_snapshot.bars)
             _, macd_histogram = macd(symbol_snapshot.bars)
             momentum = momentum_score(symbol_snapshot.bars)
             technical_score = max(min(momentum * 8 + macd_histogram * 0.2, 1.0), -1.0)
@@ -70,6 +81,10 @@ class DailyPipeline:
                 risk_flags.append("overbought")
             if current_rsi <= 30:
                 risk_flags.append("oversold")
+            if bb_pct_b >= 1.0:
+                risk_flags.append("bollinger_upper_break")
+            if bb_pct_b <= 0.0:
+                risk_flags.append("bollinger_lower_break")
 
             no_trade = confidence < 0.6 or regime.name == "Risk Off"
             if no_trade:
@@ -78,6 +93,7 @@ class DailyPipeline:
             direction_bias = direction_bias_from_pattern(pattern_contract.setup_class)
             supporting_features = {
                 "rsi": round(current_rsi, 4),
+                "bollinger_pct_b": round(bb_pct_b, 4),
                 "macd_histogram": round(macd_histogram, 4),
                 "atr": round(atr(symbol_snapshot.bars), 4),
                 "realized_volatility": round(realized_volatility(symbol_snapshot.bars), 4),
@@ -101,6 +117,12 @@ class DailyPipeline:
                 flow=flow_contract,
                 pattern=pattern_contract,
             )
+            
+            market_timeseries[symbol] = [
+                TimeseriesPoint(date=f'D{i}', close=b.close) 
+                for i, b in enumerate(symbol_snapshot.bars[-20:])
+            ]
+
             symbol_reports.append(symbol_report)
             confidence_drivers.append(
                 f"{symbol}: {technical_posture}, sentiment delta {sentiment_contract.mention_delta}, flow {flow_contract.dealer_positioning}"
@@ -118,6 +140,22 @@ class DailyPipeline:
             )
 
         top_symbol = max(symbol_reports, key=lambda item: item.confidence)
+        # Generate News (Mocking top 12)
+        top_12_news = [
+            NewsItem(topic='Market Regime', sentiment_score=regime.score, summary=regime.summary),
+            NewsItem(topic=f'Benchmark: {self.config.universe.benchmark}', sentiment_score=0.1, summary='Tracking core index performance.'),
+        ]
+        for symbol in symbol_reports[:10]:
+            top_12_news.append(
+                NewsItem(
+                    topic=f'Symbol: {symbol.ticker}', 
+                    sentiment_score=symbol.sentiment.score if symbol.sentiment else 0.0, 
+                    summary=f'{symbol.technical_posture} posture with {symbol.setup_class} setup.'
+                )
+            )
+        while len(top_12_news) < 12:
+            top_12_news.append(NewsItem(topic='Macro Update', sentiment_score=0.0, summary='Steady state macro flow.'))
+
         report = DailyReportContract(
             generated_at=snapshot.generated_at,
             benchmark=self.config.universe.benchmark,
@@ -132,6 +170,8 @@ class DailyPipeline:
             confidence_drivers=confidence_drivers,
             symbols=symbol_reports,
             downstream_handoff=handoff,
+            top_12_news=top_12_news,
+            market_timeseries=market_timeseries,
         )
 
         output_dir = self.config.reporting.output_dir

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import io
 import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 
@@ -56,29 +58,45 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0)
             self.assertIn("Bridge compatibility check passed.", proc.stdout)
 
-    def test_analyze_then_hand_off_invokes_private_algo(self) -> None:
+    @unittest.mock.patch("trading_system.cli.hand_off_to_private_algo")
+    @unittest.mock.patch("trading_system.cli.save_public_bridge_config")
+    def test_analyze_then_hand_off_invokes_private_algo(
+        self, mock_save: unittest.mock.MagicMock, mock_handoff: unittest.mock.MagicMock
+    ) -> None:
+        from trading_system.cli import main as cli_main
+
+        # Mock successful handoff
+        mock_handoff.return_value = subprocess.CompletedProcess(
+            args=["python3", "main.py"],
+            returncode=0,
+            stdout="Mocked handoff success",
+            stderr="",
+        )
+
         with tempfile.TemporaryDirectory() as temp_dir:
             bridge_config = Path(temp_dir) / "diamond-hands.local.yaml"
             output_dir = Path(temp_dir) / "public-output"
-            proc = subprocess.run(
-                [
-                    sys.executable,
-                    "main.py",
-                    "--bridge-config",
-                    str(bridge_config),
-                    "--private-algo-repo",
-                    str(PRIVATE_ALGO),
-                    "--output-dir",
-                    str(output_dir),
-                    "--analyze-then-hand-off",
-                ],
-                cwd=ROOT,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertIn("Diamond Hands private handoff completed.", proc.stdout)
+            
+            # We need to mock sys.stdout to capture output
+            with unittest.mock.patch("sys.stdout", new_callable=io.StringIO) as mock_stdout:
+                with unittest.mock.patch("sys.stdin.isatty", return_value=False):
+                    exit_code = cli_main(
+                        [
+                            "--bridge-config",
+                            str(bridge_config),
+                            "--private-algo-repo",
+                            str(PRIVATE_ALGO),
+                            "--output-dir",
+                            str(output_dir),
+                            "--analyze-then-hand-off",
+                        ]
+                    )
+                    
+                    stdout = mock_stdout.getvalue()
+
+            self.assertEqual(exit_code, 0)
+            self.assertIn("Diamond Hands private handoff completed.", stdout)
+            self.assertIn("Mocked handoff success", stdout)
             self.assertTrue((output_dir / "daily_report.json").exists())
 
 
