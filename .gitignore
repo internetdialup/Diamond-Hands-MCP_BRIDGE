@@ -1,0 +1,17 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+venv/
+.venv/
+dist/
+build/
+outputs/
+config/diamond-hands.local.yaml
+
+data/raw/
+data/intermediate/
+data/processed/

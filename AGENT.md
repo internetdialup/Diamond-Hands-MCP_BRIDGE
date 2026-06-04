@@ -1,35 +1,36 @@
 # AGENT.md
 
-You are an agent. You have landed in a fork of Documentation.md. This file is your cold start.
+You are an agent landing in the public `Diamond-Hands-MCP_BRIDGE` repo. This file is the cold-start router.
 
-Read README.md if you need to know what this repo is for. Come back here when youre done.
+## 1. Read the repo overview
 
-Order of operations on first contact:
+Read `README.md` for product identity, repo purpose, and the public/private split.
 
-## Read behavior/ first
+## 2. Read the local operating rules
 
-Read everything in behavior/ first. That is where the rules live. Context entropy, context window management, how Knobs work, what STIP and LTIP mean. Without this you will fragment the repo within a few Knobs.
+Read `Documentation.md` for bridge boundaries, mandatory rules, and the role of each working folder.
 
-## Check architecture/ when memory itself is the work
+## 3. Read current state
 
-Read architecture/ when the task touches memory architecture, ADM, RAG, drift, Watchdog, audits, or workflow governance. Do not load it just because it exists. Pull it when memory itself is the work.
+Read `docs/context-orientation.md` for the latest bridge state and recent structural changes.
 
-## Load Skills
+## 4. Read onboarding docs before changing the bridge flow
 
-Load the Skills under skills/. These are portable across vendors. Whatever model you are running on, the Skills apply the same way.
+Read:
 
-## Check workflows/
+- `docs/robinhood-agentic-trading.md`
+- `docs/private-algo-bridge.md`
 
-Look in the workflows folder for the DevOps and deployment patterns this fork uses. These can be overridden per project. Defer to the fork over the canonical version if they conflict.
+before changing the cold-start wizard, Robinhood-first onboarding, or the public-to-private handoff path.
 
-## Skip design/ on cold start
+## 5. Read research standards when the task touches analysis output
 
-Treat design/ as project-specific. Read it only when you are doing design or UI work, not as part of cold start.
+Read `docs/research-standards.md` before adding a new data source, indicator, experiment, or evaluation artifact.
 
-## Check docs/context-orientation.md
+## 6. Pull inherited support material only when needed
 
-Check if a docs/context-orientation.md file exists in the project directory you're working in. If it exists, that is the current Knob. Read it. If it does not exist, you are the agent creating one.
+Use `behavior/`, `skills/`, and `workflows/` selectively. They are support layers, not the main product surface.
 
-That is the cold start. The rest you pick up as you go.
+## 7. Keep scope clean
 
-The cold start in this directory is special. This is not a project specific repository. This is the canonical repository for the Skills, documents, and workflows that will be used across projects.
+This repo is the public bridge and research layer. Proprietary execution doctrine, broker secrets, and live-trading logic belong in the private `Diamond-Hands-Algo` repo.

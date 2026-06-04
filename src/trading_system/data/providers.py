@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+from datetime import datetime
+
+from trading_system.config import RuntimeConfig
+from trading_system.data.base import DataProvider
+from trading_system.data.models import FlowPoint, MarketSnapshot, PriceBar, SentimentPoint, SymbolSnapshot
+
+
+def _make_bars(anchor: float, trend: float, volatility: float) -> list[PriceBar]:
+    bars: list[PriceBar] = []
+    price = anchor
+    for day in range(40):
+        drift = trend * (0.8 + (day % 5) * 0.05)
+        span = volatility * (1 + (day % 3) * 0.1)
+        open_price = price
+        close_price = max(1.0, open_price + drift)
+        high = max(open_price, close_price) + span
+        low = min(open_price, close_price) - span
+        volume = 10_000_000 + day * 125_000 + volatility * 150_000
+        bars.append(
+            PriceBar(
+                open=round(open_price, 2),
+                high=round(high, 2),
+                low=round(low, 2),
+                close=round(close_price, 2),
+                volume=round(volume, 2),
+            )
+        )
+        price = close_price
+    return bars
+
+
+class ExampleMarketDataProvider(DataProvider):
+    def load_snapshot(self, config: RuntimeConfig) -> MarketSnapshot:
+        scenario = config.data_source.scenario
+        benchmark_bars = _make_bars(anchor=585, trend=1.9, volatility=3.2)
+        volatility_bars = _make_bars(anchor=17.5, trend=-0.05, volatility=0.7)
+
+        fear_greed = 71.0
+        symbol_payloads = {
+            "SPY": SymbolSnapshot(
+                symbol="SPY",
+                bars=_make_bars(anchor=584, trend=2.0, volatility=3.3),
+                sentiment=SentimentPoint(
+                    score=0.18,
+                    mentions_today=180,
+                    mentions_yesterday=95,
+                    sources={"reddit": 0.12, "news": 0.2, "x": 0.22},
+                ),
+                flow=FlowPoint(
+                    put_call_ratio=0.86,
+                    gamma_exposure=0.42,
+                    open_interest=2_500_000,
+                    unusual_volume_ratio=1.35,
+                    delta=0.55,
+                    theta=-0.22,
+                    charm=0.06,
+                    dealer_positioning="supportive",
+                ),
+                pe_ratio=27.5,
+                earnings_within_days=None,
+                guidance_signal=0.05,
+            ),
+            "QQQ": SymbolSnapshot(
+                symbol="QQQ",
+                bars=_make_bars(anchor=500, trend=2.6, volatility=4.4),
+                sentiment=SentimentPoint(
+                    score=0.31,
+                    mentions_today=240,
+                    mentions_yesterday=120,
+                    sources={"reddit": 0.28, "news": 0.35, "x": 0.3},
+                ),
+                flow=FlowPoint(
+                    put_call_ratio=0.82,
+                    gamma_exposure=0.48,
+                    open_interest=1_900_000,
+                    unusual_volume_ratio=1.42,
+                    delta=0.61,
+                    theta=-0.19,
+                    charm=0.08,
+                    dealer_positioning="supportive",
+                ),
+                pe_ratio=32.1,
+                earnings_within_days=None,
+                guidance_signal=0.08,
+            ),
+            "NVDA": SymbolSnapshot(
+                symbol="NVDA",
+                bars=_make_bars(anchor=118, trend=1.35, volatility=5.1),
+                sentiment=SentimentPoint(
+                    score=0.54,
+                    mentions_today=520,
+                    mentions_yesterday=180,
+                    sources={"reddit": 0.62, "news": 0.46, "x": 0.57, "earnings": 0.41},
+                ),
+                flow=FlowPoint(
+                    put_call_ratio=0.79,
+                    gamma_exposure=0.63,
+                    open_interest=1_250_000,
+                    unusual_volume_ratio=1.87,
+                    delta=0.68,
+                    theta=-0.25,
+                    charm=0.11,
+                    dealer_positioning="long_gamma",
+                ),
+                pe_ratio=61.4,
+                earnings_within_days=12,
+                guidance_signal=0.12,
+            ),
+        }
+
+        if scenario == "vix_spike":
+            volatility_bars = _make_bars(anchor=20, trend=0.45, volatility=1.1)
+            fear_greed = 24.0
+            symbol_payloads["SPY"].flow.gamma_exposure = -0.15
+            symbol_payloads["SPY"].flow.dealer_positioning = "fragile"
+            symbol_payloads["QQQ"].sentiment.score = -0.08
+        elif scenario == "gamma_pin":
+            symbol_payloads["SPY"].flow.gamma_exposure = 0.78
+            symbol_payloads["SPY"].flow.put_call_ratio = 0.98
+            symbol_payloads["SPY"].flow.dealer_positioning = "pinning"
+        elif scenario == "earnings_event":
+            symbol_payloads["NVDA"].earnings_within_days = 1
+            symbol_payloads["NVDA"].guidance_signal = 0.2
+            symbol_payloads["NVDA"].sentiment.mentions_today = 700
+        elif scenario == "sentiment_spike":
+            symbol_payloads["NVDA"].sentiment.mentions_today = 900
+            symbol_payloads["NVDA"].sentiment.mentions_yesterday = 120
+            symbol_payloads["NVDA"].sentiment.score = 0.66
+
+        selected_symbols = {
+            symbol: symbol_payloads[symbol]
+            for symbol in config.universe.symbols
+            if symbol in symbol_payloads
+        }
+        if config.universe.benchmark not in selected_symbols:
+            selected_symbols[config.universe.benchmark] = symbol_payloads["SPY"]
+
+        return MarketSnapshot(
+            benchmark=config.universe.benchmark,
+            benchmark_bars=benchmark_bars,
+            volatility_symbol=config.universe.volatility_symbol,
+            volatility_bars=volatility_bars,
+            fear_greed_index=fear_greed,
+            symbols=selected_symbols,
+            generated_at=datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        )
+
+
+def build_data_provider(config: RuntimeConfig) -> DataProvider:
+    provider_name = config.data_source.provider
+    if provider_name == "example_vendor":
+        return ExampleMarketDataProvider()
+    raise ValueError(f"Unsupported data provider: {provider_name}")

@@ -1,37 +1,68 @@
-# Trading-MCP-Analyzer
+# Diamond-Hands-MCP_BRIDGE
 
-Trading research and analysis workspace bootstrapped from the `Documentation.md` cold-start pattern.
+Public Robinhood-first bridge CLI for market intelligence and private trading handoff.
 
-## Purpose
-This repo is not financial advice. You can and probably will lose money. Diamond hands, and FOMO. 
-This repository is for market analysis work: data ingestion, indicator research, hypothesis testing, trade review, and documentation around what signals are worth operationalizing. This repo ingests, VIX, Fear and Greed, Wallstbets, X/Twitter, and market sentiment along with GEX, Greeks, Charm, and other Quant tools to peform stronger reinforced analysis. 
+## What This Repo Is
 
-## Statistical Analysis 
-Running - this Repo is to go with a Regime Analysis + Expectancy. Secondary to those will be relational vector mapping to matrixes, that track relationships with SPY, QQQ, movement and volume. 
+This repository is the public `Diamond Hands` bridge product. It analyzes market structure, sentiment, flow, and setup quality, then emits intelligence artifacts that a user-owned private ALGO repo can consume.
 
-## Working Focus
+It is not the final execution engine.
 
-- Connecting MCP to Trade Buy / Sell 💎🤝📊
-- Market data collection and normalization
-- Indicator and feature analysis
-- Strategy evaluation before execution work
-- Research notes, experiment logs, and outcome tracking
+## Product Split
 
-## Repo Layout
+- `Diamond-Hands-MCP_BRIDGE` is public and forkable.
+- `Diamond-Hands-Algo` is private and execution-side.
+- The public bridge helps users analyze, connect, and hand off.
+- The private ALGO repo owns proprietary filters, hard risk rules, and eventual Robinhood trade execution.
 
-- `AGENT.md` defines the cold-start order.
-- `behavior/` holds reasoning and context rules.
-- `skills/` holds portable project capabilities.
-- `workflows/` holds delivery and documentation patterns.
-- `docs/context-orientation.md` is the active repo Knob log.
+## Robinhood-First Workflow
 
-Execution and live order-routing work belong in the companion `Trading-MCP-Algo` repository unless a task is explicitly analysis-only. 
+The bridge is currently centered on Robinhood Agentic Trading and its MCP endpoint:
 
-## Connect to your own MCP Algo Repo
+- `https://agent.robinhood.com/mcp/trading`
 
-It's best to fork this and create your own MCP Algo Repo :) This is my personal experiment. You've been warned. The "house always wins".
+The public CLI explains the Robinhood onboarding path and then helps the user attach their own private ALGO repo.
 
-## Cold Start
+## Single Public CLI
 
-Agents and contributors should start with `AGENT.md`, then read `behavior/`, then `docs/context-orientation.md`, then pull in `skills/` and `workflows/` as the task requires.
+Run the public Diamond Hands bridge from this repo:
 
+```bash
+PYTHONPATH=src python3 main.py --config config/markets.example.yaml
+```
+
+Useful modes:
+
+```bash
+PYTHONPATH=src python3 main.py --setup
+PYTHONPATH=src python3 main.py --verify-bridge
+PYTHONPATH=src python3 main.py --analyze-only
+PYTHONPATH=src python3 main.py --analyze-then-hand-off
+```
+
+The local bridge state is stored in `config/diamond-hands.local.yaml`, which is intentionally gitignored.
+
+## What The Public Bridge Produces
+
+- a Robinhood-first onboarding and bridge verification flow
+- a branded market bridge report
+- a machine-readable JSON artifact
+- a downstream handoff contract compatible with the private ALGO bridge
+
+## What Forked Users Need
+
+Forking this repo is not enough for execution.
+
+Users are expected to:
+
+1. fork or clone this public bridge repo
+2. create or attach their own private `Diamond-Hands-Algo` repo
+3. connect their agent to Robinhood Agentic Trading
+4. use the public bridge output as the input to their private execution stack
+
+## Key Docs
+
+- `Documentation.md` for the bridge contract and product boundary
+- `docs/robinhood-agentic-trading.md` for Robinhood MCP onboarding
+- `docs/private-algo-bridge.md` for attaching the user’s private ALGO repo
+- `docs/context-orientation.md` for the latest state of the bridge
