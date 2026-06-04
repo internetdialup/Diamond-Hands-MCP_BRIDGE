@@ -62,22 +62,47 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def render_banner() -> None:
-    banner = r"""
-          /\        
-         /  \       
-        / /\ \      
-       / /  \ \     
-      /_/ /\ \_\    
-      \ \ \/ / /    
-       \ \  / /     
-        \ \/ /      
-         \  /       
-          \/        
-    DIAMOND HANDS
-      MCP BRIDGE
-    """
-    print(banner)
-    print("Robinhood-first public bridge for market intelligence and private ALGO handoff.")
+    cyan = "\033[38;2;0;180;255m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    bold = "\033[1m"
+    reset = "\033[0m"
+
+    if not sys.stdout.isatty():
+        cyan = ""
+        cyan_bright = ""
+        bold = ""
+        reset = ""
+
+    banner_block = [
+        "      /\\",
+        "     /  \\",
+        "    / /\\ \\",
+        "   / /  \\ \\",
+        "  /_/ /\\ \\_\\",
+        "  \\ \\ \\/ / /",
+        "   \\ \\  / /",
+        "    \\ \\/ /",
+        "     \\  /",
+        "      \\/",
+        "  DIAMOND HANDS",
+        "    MCP BRIDGE",
+    ]
+    emoji_line = "      💎🤝"
+    byline = "  by: internetdialup"
+    divider = "  ───────────────"
+    tagline = "Robinhood-first public bridge for market intelligence and private ALGO handoff."
+
+    print()
+    for line in banner_block[:10]:
+        print(f"{cyan_bright}{line}{reset}")
+    print()
+    print(f"{bold}{cyan_bright}{banner_block[10]}{reset}")
+    print(f"{bold}{cyan}{banner_block[11]}{reset}")
+    print(f"{cyan_bright}{divider}{reset}")
+    print(emoji_line)
+    print(f"{cyan}{byline}{reset}")
+    print()
+    print(tagline)
     print()
 
 
