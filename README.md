@@ -27,10 +27,10 @@ The public CLI explains the Robinhood onboarding path and then helps the user at
 
 Use the terminal CLI as the primary way to start Diamond Hands.
 
-Install the editable package:
+From the repo root, install the editable package with `python3 -m pip`:
 
 ```bash
-pip install -e .
+python3 -m pip install --user -e .
 ```
 
 Start the CLI:
@@ -69,6 +69,23 @@ Supported aliases:
 /hand-off       -> /handoff
 quit            -> /quit
 exit            -> /quit
+```
+
+### macOS Notes
+
+On some Macs, `pip` is not available as a command even when `python3` is installed. Use `python3 -m pip` instead.
+
+If `python3 -m pip install --user -e .` succeeds but `diamondhands` still says `command not found`, the installed script is likely not on your shell `PATH` yet. Add your user Python bin directory to `~/.zshrc`:
+
+```bash
+echo 'export PATH="$HOME/Library/Python/3.9/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+If you want one command that installs and launches the CLI from the repo, use:
+
+```bash
+./scripts/start_diamondhands.sh
 ```
 
 Alternative entrypoints:

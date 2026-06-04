@@ -66,13 +66,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-@dataclass
-class StatusEvent:
-    label: str
-    summary: str
-    priority: int
-
-
 @dataclass(frozen=True)
 class CommandSpec:
     command: str
@@ -80,8 +73,8 @@ class CommandSpec:
 
 
 COMMAND_SPECS = [
-    CommandSpec("/todaysupdate", "Show the market desk and top 10 events"),
-    CommandSpec("/analyze", "Run the full Diamond Hands daily analysis"),
+    CommandSpec("/todaysupdate", "Market snapshot and catalyst overview"),
+    CommandSpec("/analyze", "Deep technical, sentiment, and flow dashboard"),
     CommandSpec("/verifybridge", "Check private ALGO bridge compatibility"),
     CommandSpec("/handoff", "Send the current artifact to Diamond-Hands-Algo"),
     CommandSpec("/quit", "Exit the DH CLI session"),
@@ -158,7 +151,7 @@ def animate_status_loading(message: str) -> None:
     for frame in frames:
         sys.stdout.write(f"\r{message} {frame}")
         sys.stdout.flush()
-        time.sleep(0.15)
+        time.sleep(0.5)
     sys.stdout.write("\r" + " " * (len(message) + 6) + "\r")
     sys.stdout.flush()
 
@@ -208,99 +201,124 @@ def print_bridge_verification(notes: list[str]) -> None:
     print()
 
 
-def build_status_events(report: DailyReportContract) -> list[StatusEvent]:
-    events: list[StatusEvent] = [
-        StatusEvent(
-            label="Market Regime",
-            summary=f"{report.market_regime.name} | {report.market_regime.summary}",
-            priority=100,
-        ),
-        StatusEvent(
-            label="Benchmark",
-            summary=f"{report.benchmark} | score {report.market_regime.score}",
-            priority=95,
-        ),
-    ]
-
-    if report.top_setup:
-        events.append(
-            StatusEvent(
-                label="Top Setup",
-                summary=report.top_setup,
-                priority=90,
-            )
-        )
-
-    for driver in report.market_regime.drivers[:2]:
-        events.append(StatusEvent(label="Regime Driver", summary=driver, priority=85))
-
-    for symbol in sorted(report.symbols, key=lambda item: item.confidence, reverse=True)[:3]:
-        risk_suffix = ""
-        if symbol.risk_flags:
-            risk_suffix = f" | risks: {', '.join(symbol.risk_flags[:2])}"
-        elif symbol.no_trade:
-            risk_suffix = " | no-trade"
-        events.append(
-            StatusEvent(
-                label=symbol.ticker,
-                summary=(
-                    f"{symbol.setup_class} | {symbol.technical_posture} | "
-                    f"confidence {symbol.confidence:.2f}{risk_suffix}"
-                ),
-                priority=80,
-            )
-        )
-
-    reserved_topics = {"Market Regime", f"Benchmark: {report.benchmark}"}
-    for item in report.top_12_news:
-        if len(events) >= 10:
-            break
-        if item.topic in reserved_topics:
-            continue
-        events.append(
-            StatusEvent(
-                label=item.topic,
-                summary=item.summary,
-                priority=70,
-            )
-        )
-
-    for flag in report.no_trade_flags:
-        if len(events) >= 10:
-            break
-        events.append(StatusEvent(label="Risk Gate", summary=flag, priority=60))
-
-    unique_events: list[StatusEvent] = []
-    seen: set[tuple[str, str]] = set()
-    for event in sorted(events, key=lambda item: item.priority, reverse=True):
-        key = (event.label, event.summary)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique_events.append(event)
-        if len(unique_events) == 10:
-            break
-    return unique_events
-
-
 def print_today_status(result: PipelineResult) -> None:
     report = result.report
-    print("Today's Status")
-    print(f"Generated: {report.generated_at}")
-    print()
-    for index, event in enumerate(build_status_events(report), start=1):
-        print(f"{index:02d}. {event.label} :: {event.summary}")
-    print()
-    print("Next: analyze today's data, verify bridge, hand off, or quit.")
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    yellow = "\033[33m"
+    red = "\033[31m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    # Juicy multi-color headline
+    print(f"{bold}{cyan}💎 DIAMOND {green}HANDS {yellow}MARKET {cyan}STATUS 💎{reset}")
+    print(f"Generated: {report.generated_at} | Benchmark: {report.benchmark}")
+    print("════════════════════════════════════════════════════════════")
+    
+    # Market Regime
+    print(f"{bold}{green}📈 Market Regime:{reset} {report.market_regime.name} (Score: {report.market_regime.score})")
+    print(f"   {report.market_regime.summary}")
+    print("────────────────────────────────────────────────────────────")
+    
+    # Regime Drivers
+    print(f"{bold}{yellow}🔥 Top Regime Drivers:{reset}")
+    for driver in report.market_regime.drivers[:3]:
+        print(f"   • {driver}")
+    print("────────────────────────────────────────────────────────────")
+    
+    # Top 3 Symbols
+    print(f"{bold}{cyan}🚀 Top Actionable Setups:{reset}")
+    sorted_symbols = sorted(report.symbols, key=lambda s: s.confidence, reverse=True)
+    for symbol in sorted_symbols[:3]:
+        bias = symbol.direction_bias.lower()
+        if bias == "bullish":
+            emoji = "📈"
+            rocket = "🚀 "
+            decider = f"{green}CALL{reset}"
+        elif bias == "bearish":
+            emoji = "📉"
+            rocket = "   "
+            decider = f"{red}PUT {reset}"
+        else:
+            emoji = "↔️ "
+            rocket = "   "
+            decider = f"{yellow}HOLD{reset}"
+            
+        risk_str = f" [🚩 {', '.join(symbol.risk_flags[:2])}]" if symbol.risk_flags else ""
+        print(f"   {emoji} {rocket}{bold}{symbol.ticker:<5}{reset} | Conf: {symbol.confidence:.2f} | Setup: {symbol.setup_class} | {decider}{risk_str}")
+    print("────────────────────────────────────────────────────────────")
+    
+    # Macro Themes
+    print(f"{bold}{green}📰 Macro Catalysts:{reset}")
+    for news in report.top_12_news[:3]:
+        print(f"   • {news.topic}: {news.summary}")
+    print("════════════════════════════════════════════════════════════")
+    print("Next: /analyze for full metrics, /verifybridge, /handoff, or /quit.")
     print()
 
 
 def print_analysis_summary(result: PipelineResult) -> None:
-    print("Diamond Hands Bridge Report")
-    print(f"- Markdown report: {result.markdown_path}")
-    print(f"- JSON artifact: {result.json_path}")
-    print(f"- Market regime: {result.report.market_regime.name}")
-    print(f"- Top setup: {result.report.top_setup or 'none'}")
+    report = result.report
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    yellow = "\033[33m"
+    red = "\033[31m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    print(f"{bold}{cyan}💎 DIAMOND {green}HANDS {yellow}DEEP {cyan}ANALYSIS 💎{reset}")
+    print(f"Status: {report.market_regime.name} | Benchmark: {report.benchmark}")
+    print("════════════════════════════════════════════════════════════════════════════════════")
+    
+    # Top Setup Spotlight
+    top_symbol = max(report.symbols, key=lambda s: s.confidence)
+    print(f"{bold}{yellow}🔥 TOP SETUP SPOTLIGHT:{reset} {bold}{top_symbol.ticker}{reset}")
+    print(f"Setup: {top_symbol.setup_class} | Bias: {top_symbol.direction_bias} | Confidence: {top_symbol.confidence:.2f}")
+    print(f"Technical Posture: {top_symbol.technical_posture}")
+    
+    feat = top_symbol.supporting_features
+    tech_line = f"RSI: {feat.get('rsi', 'N/A')} | MACD Hist: {feat.get('macd_histogram', 'N/A')} | BB %B: {feat.get('bollinger_pct_b', 'N/A')}"
+    print(f"Technicals: {tech_line}")
+    
+    sent_score = top_symbol.sentiment.score if top_symbol.sentiment else "N/A"
+    flow_pos = top_symbol.flow.dealer_positioning if top_symbol.flow else "N/A"
+    print(f"Sentiment: {sent_score} | Flow Position: {flow_pos}")
+    print("────────────────────────────────────────────────────────────────────────────────────")
+    
+    # Symbol Analysis Table
+    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf':<5} {'RSI':<5} {'Flow':<6} {'Sent':<6} {'Risks'}{reset}")
+    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*5} {'-'*5} {'-'*6} {'-'*6} {'-'*15}")
+    
+    for s in report.symbols:
+        f = s.supporting_features
+        rsi_val = f"{f.get('rsi', 0.0):.1f}"
+        flow_score = f"{s.flow.score if s.flow else 0.0:.2f}"
+        sent_score = f"{s.sentiment.score if s.sentiment else 0.0:.2f}"
+        
+        # Risks
+        risk_count = len(s.risk_flags)
+        if risk_count > 0:
+            risks = f"🚩 {risk_count} flags"
+        else:
+            risks = f"{green}clean{reset}"
+            
+        # Action/Decider
+        bias = s.direction_bias.lower()
+        if bias == "bullish":
+            emoji = "📈"
+            decider = f"{green}CALL{reset}"
+        elif bias == "bearish":
+            emoji = "📉"
+            decider = f"{red}PUT {reset}"
+        else:
+            emoji = "↔️ "
+            decider = f"{yellow}HOLD{reset}"
+            
+        print(f"{emoji} {s.ticker:<5} {s.direction_bias:<7} {decider:<15} {s.setup_class[:12]:<13} {s.confidence:<5.2f} {rsi_val:<5} {flow_score:<6} {sent_score:<6} {risks}")
+    
+    print("════════════════════════════════════════════════════════════════════════════════════")
+    print(f"Markdown: {result.markdown_path}")
+    print(f"JSON:     {result.json_path}")
     print()
 
 
