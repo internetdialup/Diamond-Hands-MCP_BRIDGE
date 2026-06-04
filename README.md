@@ -25,14 +25,53 @@ The public CLI explains the Robinhood onboarding path and then helps the user at
 
 ## Single Public CLI
 
-Install and run the public Diamond Hands bridge like a normal CLI:
+Use the terminal CLI as the primary way to start Diamond Hands.
+
+Install the editable package:
 
 ```bash
 pip install -e .
+```
+
+Start the CLI:
+
+```bash
 diamondhands
 ```
 
-Frontend-style wrapper:
+This opens the interactive Diamond Hands shell in your terminal. The prompt is:
+
+```text
+diamond-hands>
+```
+
+### Terminal CLI Walkthrough
+
+When the shell opens, you can type `/commands` at any time to reopen the command desk and see the available slash commands.
+
+Primary interactive commands:
+
+```text
+/commands      Show the command desk
+/todaysupdate  Show the market desk and top 10 events
+/analyze       Run the full Diamond Hands daily analysis
+/verifybridge  Check private ALGO bridge compatibility
+/handoff       Send the current artifact to Diamond-Hands-Algo
+/quit          Exit the DH CLI session
+```
+
+Supported aliases:
+
+```text
+/help           -> /commands
+/today-status   -> /todaysupdate
+/verify-bridge  -> /verifybridge
+/hand-off       -> /handoff
+quit            -> /quit
+exit            -> /quit
+```
+
+Alternative entrypoints:
 
 ```bash
 npm run diamondhands
@@ -51,17 +90,6 @@ PYTHONPATH=src python3 main.py --setup
 PYTHONPATH=src python3 main.py --verify-bridge
 PYTHONPATH=src python3 main.py --analyze-only
 PYTHONPATH=src python3 main.py --analyze-then-hand-off
-```
-
-Inside the interactive `diamondhands` shell, start with:
-
-```text
-/commands
-/todaysupdate
-/analyze
-/verifybridge
-/handoff
-/quit
 ```
 
 The local bridge state is stored in `config/diamond-hands.local.yaml`, which is intentionally gitignored.
