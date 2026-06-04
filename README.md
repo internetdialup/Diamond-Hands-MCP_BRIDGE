@@ -60,6 +60,19 @@ Users are expected to:
 3. connect their agent to Robinhood Agentic Trading
 4. use the public bridge output as the input to their private execution stack
 
+## TL;DR & ELI5 (The "Recipe Robot")
+
+### TL;DR
+This project is a **public market intelligence engine**. It analyzes market data and identifies trading setups, then packages its findings into a machine-readable artifact for a **private** repository to execute. It provides the analysis but never manages your money or keys.
+
+### ELI5 (How it Works)
+Imagine you have two robots working together to bake cookies:
+
+1.  **The Recipe Robot (This Project):** This robot's only job is to look at the ingredients in the pantry (market data), read the cookbook (technical indicators), and figure out the perfect recipe for today. It writes the recipe down on a card and hands it off. It *never* touches the oven.
+2.  **The Chef Robot (Your Private Repo):** This robot takes that recipe card, checks if it's safe (risk rules), and then actually puts the cookies in the oven (makes the trades on Robinhood).
+
+By keeping the **Recipe Robot** public, you can share the "math" with the community without ever risking your secret passwords or personal money rules.
+
 ## Key Docs
 
 - `Documentation.md` for the bridge contract and product boundary
