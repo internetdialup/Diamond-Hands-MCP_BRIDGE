@@ -89,6 +89,27 @@ def momentum_score(bars: list[PriceBar], window: int = 10) -> float:
     return (end - start) / start
 
 
+def bollinger_bands(bars: list[PriceBar], window: int = 20, num_std: float = 2.0) -> tuple[float, float, float]:
+    values = closes(bars)
+    if len(values) < window:
+        last = values[-1] if values else 0.0
+        return last, last, last
+    window_values = values[-window:]
+    middle = mean(window_values)
+    std = pstdev(window_values)
+    upper = middle + (num_std * std)
+    lower = middle - (num_std * std)
+    return upper, middle, lower
+
+
+def bollinger_pct_b(bars: list[PriceBar], window: int = 20, num_std: float = 2.0) -> float:
+    upper, _, lower = bollinger_bands(bars, window, num_std)
+    width = upper - lower
+    if width == 0:
+        return 0.5
+    return (bars[-1].close - lower) / width
+
+
 def breakout_score(bars: list[PriceBar], window: int = 20) -> float:
     if len(bars) <= window:
         return 0.0

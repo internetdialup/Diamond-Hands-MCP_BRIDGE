@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -169,11 +170,24 @@ def main(argv: list[str] | None = None) -> int:
         if not verification.compatible:
             print("Private ALGO bridge is not compatible. Handoff skipped.")
             return 1
-        handoff = hand_off_to_private_algo(bridge_config, result.json_path)
-        print("Diamond Hands private handoff completed.")
-        if handoff.stdout.strip():
-            print(handoff.stdout.strip())
-        return 0
+        try:
+            handoff = hand_off_to_private_algo(bridge_config, result.json_path)
+            print("Diamond Hands private handoff completed.")
+            if handoff.stdout.strip():
+                print(handoff.stdout.strip())
+            return 0
+        except subprocess.CalledProcessError as e:
+            print("Diamond Hands private handoff failed.")
+            if e.stderr and e.stderr.strip():
+                print(e.stderr.strip())
+            elif e.stdout and e.stdout.strip():
+                print(e.stdout.strip())
+            else:
+                print(f"Subprocess failed with exit code {e.returncode}")
+            return 1
+        except Exception as e:
+            print(f"An unexpected error occurred during handoff: {e}")
+            return 1
 
     if not args.analyze_only:
         print("Public bridge run completed. Use --analyze-then-hand-off to push the fresh artifact into your private Diamond-Hands-Algo repo.")

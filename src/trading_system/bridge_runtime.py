@@ -37,21 +37,33 @@ def verify_private_algo_bridge(config: PublicBridgeConfig) -> BridgeVerification
     repo_exists = repo_path.exists()
     main_exists = (repo_path / "main.py").exists()
     bridge_config_exists = (repo_path / config.private_algo.bridge_config_path).exists()
+    pyproject_exists = (repo_path / "pyproject.toml").exists()
+    src_exists = (repo_path / "src").exists()
 
     if repo_exists:
         notes.append(f"Private ALGO repo found at {repo_path}")
     else:
         notes.append(f"Private ALGO repo missing at {repo_path}")
+    
     if main_exists:
         notes.append("Private ALGO CLI entrypoint detected.")
     else:
         notes.append("Private ALGO main.py missing.")
+        
     if bridge_config_exists:
         notes.append("Private ALGO bridge config detected.")
     else:
         notes.append("Private ALGO bridge config missing.")
 
-    compatible = repo_exists and main_exists and bridge_config_exists
+    if pyproject_exists:
+        notes.append("Private ALGO pyproject.toml detected.")
+    
+    if src_exists:
+        notes.append("Private ALGO src/ directory detected.")
+    else:
+        notes.append("Private ALGO src/ directory missing (likely broken).")
+
+    compatible = repo_exists and main_exists and bridge_config_exists and src_exists
     if compatible:
         notes.append("Bridge compatibility check passed.")
     else:
