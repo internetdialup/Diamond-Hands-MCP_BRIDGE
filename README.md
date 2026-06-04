@@ -1,12 +1,12 @@
 # Diamond-Hands-MCP_BRIDGE
 
-Public Robinhood-first bridge CLI for market intelligence and private trading handoff.
+Public Robinhood-first bridge CLI for market intelligence and private trading handoff. Welcome to the casino! Where everyone wins and loses! The first's one is free, but the house always wins. So, here's an MCP bridge to help you turn those Diamondhands into tangible liquidity. 💎🤝
 
-## What This Repo Is
+## What This Repo does 
 
 This repository is the public `Diamond Hands` bridge product. It analyzes market structure, sentiment, flow, and setup quality, then emits intelligence artifacts that a user-owned private ALGO repo can consume.
 
-It is not the final execution engine.
+It is not the final execution engine. This is only meant as a connector to your private repo's to build a stronger edge. 
 
 ## Product Split
 
