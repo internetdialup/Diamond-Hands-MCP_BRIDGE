@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import yfinance as yf
+
 from trading_system.config import RuntimeConfig
 from trading_system.data.base import DataProvider
 from trading_system.data.models import FlowPoint, MarketSnapshot, PriceBar, SentimentPoint, SymbolSnapshot
@@ -148,8 +150,75 @@ class ExampleMarketDataProvider(DataProvider):
         )
 
 
+class YahooFinanceProvider(DataProvider):
+    def load_snapshot(self, config: RuntimeConfig) -> MarketSnapshot:
+        symbols = list(config.universe.symbols)
+        all_tickers = symbols + [config.universe.benchmark, config.universe.volatility_symbol]
+        
+        # Deduplicate
+        all_tickers = list(dict.fromkeys(all_tickers))
+        
+        # Fetch 60 days of data to ensure enough for 20-day technicals
+        data = yf.download(all_tickers, period="60d", interval="1d", group_by='ticker', progress=False)
+        
+        symbol_snapshots: dict[str, SymbolSnapshot] = {}
+        for symbol in symbols:
+            ticker_data = data[symbol]
+            bars = []
+            for idx, row in ticker_data.iterrows():
+                if hasattr(row, 'Close') and not hasattr(row.Close, '__iter__'): # Handle single vs multi-index
+                    bars.append(PriceBar(
+                        open=float(row.Open),
+                        high=float(row.High),
+                        low=float(row.Low),
+                        close=float(row.Close),
+                        volume=float(row.Volume)
+                    ))
+            
+            # For now, we keep mock sentiment and flow since we don't have real providers for those yet
+            symbol_snapshots[symbol] = SymbolSnapshot(
+                symbol=symbol,
+                bars=bars,
+                sentiment=SentimentPoint(score=0.2, mentions_today=100, mentions_yesterday=80),
+                flow=FlowPoint(
+                    put_call_ratio=0.9, 
+                    gamma_exposure=0.3, 
+                    open_interest=1000000, 
+                    unusual_volume_ratio=1.1,
+                    delta=0.5,
+                    theta=-0.1,
+                    charm=0.05,
+                    dealer_positioning="supportive"
+                )
+            )
+
+        benchmark_data = data[config.universe.benchmark]
+        benchmark_bars = [
+            PriceBar(open=float(r.Open), high=float(r.High), low=float(r.Low), close=float(r.Close), volume=float(r.Volume))
+            for _, r in benchmark_data.iterrows()
+        ]
+
+        vol_data = data[config.universe.volatility_symbol]
+        vol_bars = [
+            PriceBar(open=float(r.Open), high=float(r.High), low=float(r.Low), close=float(r.Close), volume=float(r.Volume))
+            for _, r in vol_data.iterrows()
+        ]
+
+        return MarketSnapshot(
+            benchmark=config.universe.benchmark,
+            benchmark_bars=benchmark_bars,
+            volatility_symbol=config.universe.volatility_symbol,
+            volatility_bars=vol_bars,
+            fear_greed_index=50.0, # Placeholder
+            symbols=symbol_snapshots,
+            generated_at=datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
+        )
+
+
 def build_data_provider(config: RuntimeConfig) -> DataProvider:
     provider_name = config.data_source.provider
     if provider_name == "example_vendor":
         return ExampleMarketDataProvider()
+    if provider_name == "yfinance":
+        return YahooFinanceProvider()
     raise ValueError(f"Unsupported data provider: {provider_name}")

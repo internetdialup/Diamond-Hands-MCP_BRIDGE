@@ -8,6 +8,9 @@ version = "0.1.0"
 description = "Research intelligence platform for trading analysis and downstream execution handoff."
 requires-python = ">=3.9"
 
+[project.scripts]
+diamondhands = "trading_system.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

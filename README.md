@@ -25,10 +25,23 @@ The public CLI explains the Robinhood onboarding path and then helps the user at
 
 ## Single Public CLI
 
-Run the public Diamond Hands bridge from this repo:
+Install and run the public Diamond Hands bridge like a normal CLI:
 
 ```bash
-PYTHONPATH=src python3 main.py --config config/markets.example.yaml
+pip install -e .
+diamondhands
+```
+
+Frontend-style wrapper:
+
+```bash
+npm run diamondhands
+```
+
+Fallback dev entrypoint:
+
+```bash
+PYTHONPATH=src python3 main.py
 ```
 
 Useful modes:
@@ -38,6 +51,17 @@ PYTHONPATH=src python3 main.py --setup
 PYTHONPATH=src python3 main.py --verify-bridge
 PYTHONPATH=src python3 main.py --analyze-only
 PYTHONPATH=src python3 main.py --analyze-then-hand-off
+```
+
+Inside the interactive `diamondhands` shell, start with:
+
+```text
+/commands
+/todaysupdate
+/analyze
+/verifybridge
+/handoff
+/quit
 ```
 
 The local bridge state is stored in `config/diamond-hands.local.yaml`, which is intentionally gitignored.
@@ -79,3 +103,4 @@ By keeping the **Recipe Robot** public, you can share the "math" with the commun
 - `docs/robinhood-agentic-trading.md` for Robinhood MCP onboarding
 - `docs/private-algo-bridge.md` for attaching the user’s private ALGO repo
 - `docs/context-orientation.md` for the latest state of the bridge
+- `scripts/learn_diamondhands_cli.py` for a commented demo of the CLI strings, animation, and command map

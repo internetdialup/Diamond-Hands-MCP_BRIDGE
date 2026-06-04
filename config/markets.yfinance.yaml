@@ -1,0 +1,28 @@
+universe:
+  symbols:
+    - SPY
+    - QQQ
+    - NVDA
+  benchmark: SPY
+  volatility_symbol: VIX
+
+timeframes:
+  primary: 1d
+  secondary:
+    - 1h
+
+data_source:
+  provider: yfinance
+  scenario: baseline
+  timezone: America/Chicago
+  adjusted_prices: true
+
+reporting:
+  output_dir: outputs/daily
+
+engines:
+  enabled:
+    - regime
+    - sentiment
+    - flow
+    - pattern
