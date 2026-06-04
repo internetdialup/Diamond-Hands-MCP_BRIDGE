@@ -3,9 +3,11 @@
 Trading research and analysis workspace bootstrapped from the `Documentation.md` cold-start pattern.
 
 ## Purpose
+This repo is not financial advice. You can and probably will lose money. Diamond hands, and FOMO. 
+This repository is for market analysis work: data ingestion, indicator research, hypothesis testing, trade review, and documentation around what signals are worth operationalizing. This repo ingests, VIX, Fear and Greed, Wallstbets, X/Twitter, and market sentiment along with GEX, Greeks, Charm, and other Quant tools to peform stronger reinforced analysis. 
 
-This repository is for market analysis work: data ingestion, indicator research, hypothesis testing, trade review, and documentation around what signals are worth operationalizing.
-
+## Statistical Analysis 
+Running - this Repo is to go with a Regime Analysis + Expectancy. Secondary to those will be relational vector mapping to matrixes, that track relationships with SPY, QQQ, movement and volume. 
 
 ## Working Focus
 
@@ -28,3 +30,4 @@ Execution and live order-routing work belong in the companion `Trading-MCP-Algo`
 ## Cold Start
 
 Agents and contributors should start with `AGENT.md`, then read `behavior/`, then `docs/context-orientation.md`, then pull in `skills/` and `workflows/` as the task requires.
+
