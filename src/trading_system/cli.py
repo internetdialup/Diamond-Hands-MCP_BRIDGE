@@ -753,7 +753,6 @@ def show_startup_intro(connected: bool | None = None, rh_connected: bool | None 
     render_banner(connected, rh_connected, animate=True)
     print_intro_command_table()
 
-
 def run_interactive_shell(
     args: argparse.Namespace,
     bridge_config,
@@ -762,9 +761,11 @@ def run_interactive_shell(
 ) -> int:
     last_result: PipelineResult | None = None
     tracked_tickers: list[str] = ["$SPY", "$QQQ"]
+    voice_enabled: bool = True # Default ON
     bold = "\033[1m"
     reset = "\033[0m"
-    show_startup_intro()
+    show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed)
+
     if bridge_status_note:
         print(bridge_status_note)
         print()
@@ -1079,13 +1080,14 @@ def main(argv: list[str] | None = None) -> int:
             print()
 
     verification = verify_private_algo_bridge(bridge_config)
-    render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
 
     if args.setup and not (args.verify_bridge or args.analyze_only or args.analyze_then_hand_off):
+        render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
         print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
         return 0
 
     if args.verify_bridge:
+        render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
         print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
         print_bridge_verification(verification.notes)
         return 0 if verification.compatible else 1
@@ -1093,6 +1095,7 @@ def main(argv: list[str] | None = None) -> int:
     if interactive_mode:
         return run_interactive_shell(args, bridge_config, verification, bridge_status_note)
 
+    render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
     print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
     print_bridge_verification(verification.notes)
     result = run_pipeline(args.config, args.output_dir)
