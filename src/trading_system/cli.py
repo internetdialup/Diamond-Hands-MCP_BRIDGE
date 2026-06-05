@@ -83,24 +83,25 @@ class CommandSpec:
 
 
 CORE_COMMAND_SPECS = [
-    CommandSpec("/commands", "Show the starter command list"),
+    CommandSpec("/commands", "Show this core command list"),
     CommandSpec("/todaysupdate", "Show today's market summary"),
-    CommandSpec("/analyze", "Show the full analysis report"),
-    CommandSpec("/verifybridge", "Check your private connector"),
-    CommandSpec("/handoff", "Send the latest report to your private repo"),
+    CommandSpec("/analyze", "Show the full deep-dive analysis report"),
+    CommandSpec("/viewall", "Show advanced modules (Sniper, WSB, Strategy, etc.)"),
+    CommandSpec("/settings", "Open CLI settings (Autopilot mode)"),
+    CommandSpec("/quit", "Exit the CLI"),
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
-    CommandSpec("/viewall", "Show the full command list"),
+    CommandSpec("/more", "Alias for /viewall"),
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
     CommandSpec("/marketrecap", "Show a market recap view"),
     CommandSpec("/marketnews", "Show the market news view"),
     CommandSpec("/tickersniper", "Track up to three symbols locally"),
     CommandSpec("/trumptracker", "Monitor specific political market impacts"),
     CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
     CommandSpec("/runstrategy", "Run the experimental strategy view"),
-    CommandSpec("/settings", "Open CLI settings"),
     CommandSpec("/clear", "Clear the screen and keep the prompt ready"),
-    CommandSpec("/quit", "Exit the CLI"),
 ]
 
 COMMAND_ALIASES = {
@@ -433,6 +434,7 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     reset = "\033[0m"
     bold = "\033[1m"
     
+    print("════════════════════════════════════════════════════════════")
     human_date = format_human_date(report.generated_at)
     wallstreet_time = get_wallstreet_time()
     
@@ -442,10 +444,10 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print(f"Generated: {human_date}")
     print(f"🕒 Local time on Wall Street: {wallstreet_time}")
     print(f"Benchmark: {report.benchmark}")
-    print("════════════════════════════════════════════════════════════")
+    print("─" * 60)
     
     # Market Regime
-    print(f"{bold}{green}📈 Market Regime:{reset} {report.market_regime.name} (Score: {report.market_regime.score})")
+    print(f"{bold}{green}📈 Market Regime:{reset} {report.market_regime.name} [Score: {report.market_regime.score} — scale -1.0 (Panic) to +1.0 (Euphoria)]")
     print(f"   {report.market_regime.summary}")
     print("────────────────────────────────────────────────────────────")
     
@@ -536,20 +538,22 @@ def print_analysis_summary(result: PipelineResult) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     
+    print("════════════════════════════════════════════════════════════════════════════════════")
     human_date = format_human_date(report.generated_at)
     wallstreet_time = get_wallstreet_time()
     
-    print(f"{bold}{cyan}💎 DIAMOND {green}HANDS {yellow}DEEP {cyan}ANALYSIS 💎{reset}")
+    print(f"{bold}{cyan}💎 DIAMOND HANDS DEEP ANALYSIS 💎{reset}")
     print(f"Status: {report.market_regime.name} | Benchmark: {report.benchmark}")
     print(f"Generated: {human_date}")
     print(f"🕒 Local time on Wall Street: {wallstreet_time}")
-    print("════════════════════════════════════════════════════════════════════════════════════")
+    print("─" * 84)
     
     # Top Setup Spotlight
     top_symbol = max(report.symbols, key=lambda s: s.confidence)
     print(f"{bold}{yellow}🔥 TOP SETUP SPOTLIGHT:{reset} {bold}{top_symbol.ticker}{reset}")
     chart = create_barchart(top_symbol.confidence, width=20)
-    print(f"Setup: {top_symbol.setup_class} | Bias: {top_symbol.direction_bias} | Confidence: {chart}")
+    print(f"Setup: {top_symbol.setup_class} (High probability trend setup) | Bias: {top_symbol.direction_bias}")
+    print(f"Algorithm Conviction: {chart} ({int(top_symbol.confidence * 100)}%)")
     print(f"Technical Posture: {top_symbol.technical_posture}")
     
     feat = top_symbol.supporting_features
@@ -559,18 +563,34 @@ def print_analysis_summary(result: PipelineResult) -> None:
     sent_val = top_symbol.sentiment.score if top_symbol.sentiment else 0.0
     sent_delta = top_symbol.sentiment.mention_delta if top_symbol.sentiment else 0
     velocity = " ↗️" if sent_delta > 0 else " ↘️" if sent_delta < 0 else ""
-    print(f"Sentiment: {sent_val}{velocity} | Flow Position: {top_symbol.flow.dealer_positioning if top_symbol.flow else 'N/A'}")
+    
+    # Flow Interpretation
+    flow_raw = top_symbol.flow.dealer_positioning if top_symbol.flow else "N/A"
+    flow_map = {
+        "long_gamma": "Supportive (Dealers buying dips)",
+        "short_gamma": "Fragile (Dealers selling rips)",
+        "pinning": "Stable (Price sticky at strikes)",
+        "supportive": "Stable (Orderly flow)",
+        "fragile": "Weak (Volume exiting)"
+    }
+    flow_desc = flow_map.get(flow_raw, "N/A")
+    print(f"Sentiment: {sent_val}{velocity} | Flow Position: {flow_raw} — {flow_desc}")
 
     # Institutional Liquidity & Consensus
     sweep = feat.get("liquidity_sweep", "none").replace("_", " ").upper()
     votes = feat.get("votes", {})
     vote_line = f"Regime: {votes.get('regime')} | Technical: {votes.get('technical')} | Flow: {votes.get('flow')} | Sentiment: {votes.get('sentiment')}"
     print(f"Liquidity: {bold}{sweep}{reset} | Consensus: {vote_line}")
+    
+    # Risks Explanation
+    risk_count = len(top_symbol.risk_flags)
+    risk_msg = f" - warning: {', '.join(top_symbol.risk_flags)}" if risk_count > 0 else ""
+    print(f"Risks: {risk_count} flag{'s' if risk_count != 1 else ''}{risk_msg}")
     print("────────────────────────────────────────────────────────────────────────────────────")
     
     # Symbol Analysis Table
-    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf Barchart':<15} {'Risks'}{reset}")
-    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*15} {'-'*15}")
+    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Algorithm Conviction':<25} {'Risks'}{reset}")
+    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*20} {'-'*25}")
     
     for s in report.symbols:
         # Action/Decider
@@ -590,7 +610,7 @@ def print_analysis_summary(result: PipelineResult) -> None:
         # Risks
         risk_count = len(s.risk_flags)
         if risk_count > 0:
-            risks = f"🚩 {risk_count} flags"
+            risks = f"🚩 {risk_count} flag{'s' if risk_count > 1 else ''} (Check details)"
         else:
             risks = f"{green}clean{reset}"
             
@@ -610,6 +630,7 @@ def print_market_recap(result: PipelineResult) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     
+    print("════════════════════════════════════════════════════════════")
     human_date = format_human_date(report.generated_at)
     
     print(f"{bold}📊 Market Report · {human_date}{reset}")
@@ -632,6 +653,7 @@ def print_market_news(result: PipelineResult) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     
+    print("════════════════════════════════════════════════════════════")
     # Dynamic day detection
     now = datetime.utcnow()
     tomorrow = now + timedelta(days=1)
