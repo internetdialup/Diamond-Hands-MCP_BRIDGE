@@ -169,6 +169,15 @@ def get_wallstreet_time() -> str:
     return edt_now.strftime("%-I%p EST")
 
 
+def play_alert(message: str) -> None:
+    if sys.platform == "darwin":
+        try:
+            # -v Samantha for a nice natural fund manager voice
+            subprocess.run(["say", "-v", "Samantha", message], check=False)
+        except Exception:
+            pass
+
+
 def cyan_gradient(text: str) -> str:
     if not sys.stdout.isatty():
         return text
@@ -487,6 +496,8 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
             emoji = "📈"
             rocket = "🚀 "
             decider = f"{green}CALL{reset}"
+            if symbol.confidence >= 0.85:
+                play_alert(f"Boss, we have a high confidence call setup on {symbol.ticker}")
         elif bias == "bearish":
             emoji = "📉"
             rocket = "   "
@@ -545,9 +556,10 @@ def print_analysis_summary(result: PipelineResult) -> None:
     tech_line = f"RSI: {feat.get('rsi', 'N/A')} | MACD Hist: {feat.get('macd_histogram', 'N/A')} | BB %B: {feat.get('bollinger_pct_b', 'N/A')}"
     print(f"Technicals: {tech_line}")
     
-    sent_score = top_symbol.sentiment.score if top_symbol.sentiment else "N/A"
-    flow_pos = top_symbol.flow.dealer_positioning if top_symbol.flow else "N/A"
-    print(f"Sentiment: {sent_score} | Flow Position: {flow_pos}")
+    sent_val = top_symbol.sentiment.score if top_symbol.sentiment else 0.0
+    sent_delta = top_symbol.sentiment.mention_delta if top_symbol.sentiment else 0
+    velocity = " ↗️" if sent_delta > 0 else " ↘️" if sent_delta < 0 else ""
+    print(f"Sentiment: {sent_val}{velocity} | Flow Position: {top_symbol.flow.dealer_positioning if top_symbol.flow else 'N/A'}")
 
     # Institutional Liquidity & Consensus
     sweep = feat.get("liquidity_sweep", "none").replace("_", " ").upper()
@@ -557,8 +569,8 @@ def print_analysis_summary(result: PipelineResult) -> None:
     print("────────────────────────────────────────────────────────────────────────────────────")
     
     # Symbol Analysis Table
-    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf Barchart'}{reset}")
-    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*15}")
+    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf Barchart':<15} {'Risks'}{reset}")
+    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*15} {'-'*15}")
     
     for s in report.symbols:
         # Action/Decider
@@ -574,7 +586,15 @@ def print_analysis_summary(result: PipelineResult) -> None:
             decider = f"{yellow}HOLD{reset}"
             
         conf_chart = create_barchart(s.confidence, width=15)
-        print(f"{emoji} {s.ticker:<5} {s.direction_bias:<7} {decider:<15} {s.setup_class[:12]:<13} {conf_chart}")
+        
+        # Risks
+        risk_count = len(s.risk_flags)
+        if risk_count > 0:
+            risks = f"🚩 {risk_count} flags"
+        else:
+            risks = f"{green}clean{reset}"
+            
+        print(f"{emoji} {s.ticker:<5} {s.direction_bias:<7} {decider:<15} {s.setup_class[:12]:<13} {conf_chart:<24} {risks}")
     
     print("════════════════════════════════════════════════════════════════════════════════════")
     print(f"Markdown: {result.markdown_path}")
