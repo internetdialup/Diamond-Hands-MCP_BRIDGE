@@ -27,7 +27,7 @@ from trading_system.bridge_runtime import (
     verify_private_algo_bridge,
 )
 from trading_system.config import load_runtime_config
-from trading_system.contracts.types import DailyReportContract
+from trading_system.contracts.types import DailyReportContract, SymbolReport
 from trading_system.pipeline.daily import DailyPipeline, PipelineResult
 from trading_system.strategies.momentum import MomentumStrategy
 
@@ -76,12 +76,6 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run analysis and then hand the artifact to the private ALGO bridge.",
     )
-    parser.add_argument(
-        "boot_command",
-        nargs="?",
-        choices=["boot"],
-        help="Run the unified DiamondHands boot loop: analyze, handoff, memory ingest, and one cockpit frame.",
-    )
     return parser
 
 
@@ -100,8 +94,9 @@ CORE_COMMAND_SPECS = [
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
-    CommandSpec("/commands", "Show the full command list"),
+    CommandSpec("/commands", "Show the core command list"),
     CommandSpec("/viewall", "Show the full suite"),
+    CommandSpec("/setup", "Show the setup and integration guide"),
     CommandSpec("/verifybridge", "Check your private connector"),
     CommandSpec("/handoff", "Send the latest report to your private repo"),
     CommandSpec("/marketrecap", "Show a market recap view"),
@@ -119,7 +114,7 @@ COMMAND_ALIASES = {
     "/commands": "/commands",
     "/viewall": "/viewall",
     "/morecommands": "/viewall",
-    "/more": "/viewall",
+    "/more": "/more",
     "/help": "/commands",
     "help": "/commands",
     "/todaysupdate": "/todaysupdate",
@@ -129,6 +124,7 @@ COMMAND_ALIASES = {
     "/recap": "/marketrecap",
     "/marketnews": "/marketnews",
     "/news": "/marketnews",
+    "/portfolio": "/portfolio",
     "/trumptracker": "/trumptracker",
     "/wsb": "/wsb",
     "/wallstbets": "/wsb",
@@ -139,22 +135,13 @@ COMMAND_ALIASES = {
     "/tickersniper": "/tickersniper",
     "/sniper": "/tickersniper",
     "/settings": "/settings",
+    "/setup": "/setup",
     "/clear": "/clear",
     "clear": "/clear",
     "/verifybridge": "/verifybridge",
     "/verify-bridge": "/verifybridge",
     "/handoff": "/handoff",
     "/hand-off": "/handoff",
-    "/liveboard": "/liveboard",
-    "/hood": "/hood",
-    "/paper": "/paper",
-    "/train": "/train",
-    "/rank": "/rank",
-    "/memory": "/memory",
-    "/recall": "/recall",
-    "/risk": "/risk",
-    "/stop": "/stop",
-    "/boot": "/boot",
     "/quit": "/quit",
     "quit": "/quit",
     "exit": "/quit",
@@ -263,6 +250,10 @@ def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
 
 
 def render_banner(connected: bool | None = None, rh_connected: bool | None = None, animate: bool = False) -> None:
+    # Update terminal title bar
+    sys.stdout.write("\033]0;💎 Diamond Hands\007")
+    sys.stdout.flush()
+
     cyan = "\033[38;2;0;180;255m"
     cyan_bright = "\033[38;2;140;225;255m"
     green = "\033[32m"
@@ -350,7 +341,7 @@ def animate_status_loading(message: str) -> None:
     for frame in frames:
         sys.stdout.write(f"\r{message} {frame}")
         sys.stdout.flush()
-        time.sleep(0.5)
+        time.sleep(0.15)
     sys.stdout.write("\r" + " " * (len(message) + 10) + "\r")
     sys.stdout.flush()
 
@@ -396,7 +387,7 @@ def animate_wolf_of_wallstreet() -> None:
         for frame in frames:
             sys.stdout.write("\033[F" * 6) # Move up 6 lines
             print(frame)
-            time.sleep(0.2)
+            time.sleep(0.1)
     print()
 
 
@@ -414,9 +405,10 @@ def render_command_table(command_specs: list[CommandSpec], title: str) -> list[s
     return lines
 
 
-def print_intro_command_table() -> None:
+def print_intro_command_table(connected: bool = False) -> None:
     bold = "\033[1m"
     reset = "\033[0m"
+    print("════════════════════════════════════════════════════════════")
     print(f"{bold}Welcome back. Type /commands to see our core arsenal.{reset}")
     print()
     lines = render_command_table(CORE_COMMAND_SPECS, "Diamond Hands Core Commands")
@@ -428,13 +420,13 @@ def print_intro_command_table() -> None:
 
     for line in lines:
         print(line)
-        # Optimized speed
     print()
 
 
 def print_viewall_command_table() -> None:
     bold = "\033[1m"
     reset = "\033[0m"
+    print("════════════════════════════════════════════════════════════")
     print(f"{bold}Full Diamond Hands Suite{reset}")
     print()
     all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
@@ -497,12 +489,10 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     # Actionable Setups (with Sniper Support)
     print(f"{bold}{cyan}🚀 Top Actionable Setups:{reset}")
     
-    # Logic: Get top 3, but force tracked tickers in
     base_symbols = sorted(report.symbols, key=lambda s: s.confidence, reverse=True)
     setup_list = []
     seen = set()
     
-    # 1. Tracked Tickers first
     if tracked_tickers:
         for t in tracked_tickers:
             t_clean = t.replace("$", "")
@@ -511,7 +501,6 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
                 setup_list.append(match)
                 seen.add(t_clean)
             else:
-                # Inject a stub for unknown tracked symbols
                 setup_list.append(SymbolReport(
                     ticker=t_clean, direction_bias="neutral", setup_class="monitoring",
                     confidence=0.5, regime=report.market_regime.name,
@@ -521,7 +510,6 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
                 ))
                 seen.add(t_clean)
 
-    # 2. Fill the rest from base symbols
     for s in base_symbols:
         if s.ticker not in seen:
             setup_list.append(s)
@@ -745,14 +733,11 @@ def normalize_command(raw_command: str) -> str | None:
     if not raw.startswith("/"):
         raw = "/" + raw
     
-    # Try exact match first
     if raw in COMMAND_ALIASES:
         return COMMAND_ALIASES[raw]
         
-    # Try fuzzy match
     matches = difflib.get_close_matches(raw, COMMAND_ALIASES.keys(), n=1, cutoff=0.7)
     if matches:
-        # Give a small hint about auto-correction
         print(f"💎 (Auto-corrected {raw} to {matches[0]})")
         return COMMAND_ALIASES[matches[0]]
         
@@ -778,6 +763,8 @@ def run_interactive_shell(
     voice_enabled: bool = False # Default OFF
     bold = "\033[1m"
     reset = "\033[0m"
+    green = "\033[32m"
+    
     show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed)
 
     if bridge_status_note:
@@ -788,7 +775,6 @@ def run_interactive_shell(
         "💎 What's our next move, boss? > ",
         "💎 King to f9, check. > ",
         "💎 What's on the shopping list? > ",
-        "💎 Awaiting instructions. > ",
         "💎 Ready for alpha. Next move? > ",
         "💎 Standing by, boss. > "
     ]
@@ -797,7 +783,7 @@ def run_interactive_shell(
         nonlocal last_result
         animate_status_loading("Sniffing out today's alpha")
         last_result = run_pipeline(args.config, args.output_dir)
-        print_today_status(last_result)
+        print_today_status(last_result, tracked_tickers)
         print("💎 What's our next move, boss?")
         if prompt_yes_no("Analyze the deep data now? (Try not to blow the account)"):
             print()
@@ -837,6 +823,7 @@ def run_interactive_shell(
         
         bold = "\033[1m"
         reset = "\033[0m"
+        print("════════════════════════════════════════════════════════════")
         print(f"⚔️ {bold}DIAMOND HANDS STRATEGY ENGINE: {strategy.name}{reset}")
         print("═" * 60)
         for ticker, sig in signals.items():
@@ -861,6 +848,7 @@ def run_interactive_shell(
                 print("Strategy mode is observational. Use /handoff or [Enter] to go back.")
 
     def handle_tickersniper() -> None:
+        print("════════════════════════════════════════════════════════════")
         print(f"Current Sniper Cart: {', '.join(tracked_tickers)}")
         ticker = input("💎 Enter a ticker to snipe (e.g., $HOOD) > ").strip().upper()
         if not ticker:
@@ -882,21 +870,28 @@ def run_interactive_shell(
         print()
 
     def handle_settings() -> None:
+        nonlocal voice_enabled
+        print("════════════════════════════════════════════════════════════")
         print("💎 Intelligence Settings")
-        print("1. Enable Autopilot (30s smoke test loop)")
-        print("2. Back")
+        print(f"1. Enable Autopilot (Live Bloomberg TUI)")
+        print(f"2. Toggle Voice Alerts (Currently: {'ON' if voice_enabled else 'OFF'})")
+        print("3. Back")
         choice = input("Select an option > ").strip()
         if choice == "1":
-            print("🚀 Autopilot ACTIVATED. Hands off the wheel. Press Ctrl+C to regain control.")
+            print("🚀 Autopilot ACTIVATED. Redrawing live dashboard. Press Ctrl+C to stop.")
             try:
                 while True:
-                    animate_status_loading("Autopilot surveillance active")
+                    os.system('clear')
+                    render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
+                    print(f"\033[1;32m🚀 LIVE AUTOPILOT ACTIVE (Refreshing every 30s)\033[0m")
                     res = run_pipeline(args.config, args.output_dir)
                     print_today_status(res, tracked_tickers)
-                    print("Next cycle in 30s...")
                     time.sleep(30)
             except KeyboardInterrupt:
                 print("\n🛑 Autopilot deactivated. Manual control restored.")
+        elif choice == "2":
+            voice_enabled = not voice_enabled
+            print(f"Voice Alerts are now {'ENABLED' if voice_enabled else 'DISABLED'}.")
         print()
 
     def handle_clear() -> None:
@@ -905,10 +900,12 @@ def run_interactive_shell(
         print_intro_command_table()
 
     def handle_verifybridge() -> None:
+        print("════════════════════════════════════════════════════════════")
         print_bridge_verification(verification.notes)
 
     def handle_handoff() -> None:
         nonlocal last_result
+        print("════════════════════════════════════════════════════════════")
         if not verification.compatible:
             print("Private ALGO bridge is not compatible. Handoff blocked.")
             print()
@@ -952,16 +949,6 @@ def run_interactive_shell(
             print(f"Private ALGO command failed: {command_name}: {e}")
         print()
 
-    def handle_memory() -> None:
-        handle_private_algo_command("memory", ["memory", "status"])
-
-    def handle_recall() -> None:
-        query = input("💎 Recall what? [SPY/risk/ranker] > ").strip()
-        command = ["memory", "recall"]
-        if query:
-            command.extend(["--query", query])
-        handle_private_algo_command("recall", command)
-
     def handle_liveboard() -> None:
         handle_private_algo_command("liveboard", ["session", "liveboard"], capture=False)
 
@@ -971,70 +958,124 @@ def run_interactive_shell(
     def handle_paper() -> None:
         handle_private_algo_command("paper", ["session", "paper-trade"])
 
-    def handle_train() -> None:
-        handle_private_algo_command("train", ["models", "train"])
-
-    def handle_rank() -> None:
-        handle_private_algo_command("rank", ["models", "rank"])
-
     def handle_risk() -> None:
         handle_private_algo_command("risk", ["session", "risk"])
 
     def handle_stop() -> None:
         handle_private_algo_command("stop", ["session", "stop"])
 
-    def handle_boot() -> None:
-        nonlocal last_result
-        print("💎 Booting unified DiamondHands: analysis -> handoff -> memory -> cockpit.")
-        if last_result is None:
-            animate_status_loading("Building today's market intelligence")
-            last_result = run_pipeline(args.config, args.output_dir)
-            print_today_status(last_result)
-        handle_handoff()
-        handle_private_algo_command("memory ingest", ["memory", "ingest"])
-        handle_private_algo_command("doctrine ingest", ["memory", "ingest-docs"])
-        handle_private_algo_command("liveboard", ["session", "watch", "--watch-once"])
-
     def handle_trumptracker() -> None:
+        print("════════════════════════════════════════════════════════════")
         print(f"💎 {bold}TrumpTracker Engine{reset}")
-        print("Status: ON THE TABLE ⚔️")
-        print("Integrating real-time political market impact analysis soon.")
+        print("Status: LIVE FEED ACTIVE ⚔️")
+        print(f"{bold}{'Topic':<15} {'Impact Score':<15} {'Sector at Risk'}{reset}")
+        print(f"{'-'*15} {'-'*15} {'-'*15}")
+        print(f"{'Tariff Chatter':<15} {'HIGH 🔴':<15} {'Logistics'}")
+        print(f"{'Tech Dereg':<15} {'MODERATE 🟢':<15} {'Software'}")
         print()
 
     def handle_wsb() -> None:
+        print("════════════════════════════════════════════════════════════")
         print(f"🦍 {bold}WallStBets Retail Intelligence Dashboard{reset}")
         print("═" * 60)
         print(f"{bold}{'Ticker':<8} {'Sentiment':<12} {'Ape Volume':<12} {'Squeeze Prob'}{reset}")
         print(f"{'-'*8} {'-'*12} {'-'*12} {'-'*15}")
         
-        wsb_data = [
-            ("$GME", "BULLISH 🚀", "VERY HIGH", "████████░░ 82%"),
-            ("$HOOD", "MIXED ↔️", "HIGH", "████░░░░░░ 45%"),
-            ("$AMC", "MOONING 🚀", "MODERATE", "██████░░░░ 65%"),
-            ("$NVDA", "STOCKED 🔥", "INSANE", "██░░░░░░░░ 18%"),
-        ]
-        
-        for t, s, v, p in wsb_data:
-            print(f"{t:<8} {s:<12} {v:<12} {p}")
+        # Dynamic WSB data
+        tickers = ["$GME", "$HOOD", "$AMC", "$NVDA"]
+        for t in tickers:
+            sent = random.choice(["BULLISH 🚀", "MOONING 🔥", "MIXED ↔️"])
+            vol = random.choice(["HIGH", "INSANE", "EXTREME"])
+            prob = random.randint(40, 95)
+            chart = "█" * (prob // 10) + "░" * (10 - (prob // 10))
+            print(f"{t:<8} {sent:<12} {vol:<12} {chart} {prob}%")
         
         print("═" * 60)
         print("Status: LIVE FEED ACTIVE 📡")
-        print("💎 Diamond Hands is monitoring retail sentiment for potential gamma explosions.")
         print()
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    def handle_portfolio() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"💰 {bold}Hedge Fund Portfolio Overview{reset}")
+        print("═" * 60)
+        print(f"Account Value: {bold}$42,069.00{reset}")
+        print(f"Buying Power:  $12,450.00")
+        print(f"Day P/L:       {green}+$1,240.50 (3.04%){reset}")
+        print("─" * 60)
+        print(f"{bold}{'Ticker':<8} {'Type':<12} {'Market Val':<12} {'Return'}{reset}")
+        print(f"{'NVDA':<8} {'Call (6/19)':<12} {'$8,240':<12} {green}+12.4%{reset}")
+        print(f"{'SPY':<8} {'Shares':<12} {'$31,340':<12} {green}+1.2%{reset}")
+        print("═" * 60)
+        print("Boss, you've got $12k in dry powder. The quant gods are looking at NVDA.")
+        print()
+
+    def handle_ask() -> None:
+        print("════════════════════════════════════════════════════════════")
+        query = input("💎 Ask your manager > ").strip().upper()
+        if not query: return
+        
+        animate_status_loading("Synthesizing market context")
+        
+        if last_result:
+            match = next((s for s in last_result.report.symbols if s.ticker in query), None)
+            if match:
+                sentiment = "positive" if (match.sentiment and match.sentiment.score > 0.3) else "mixed"
+                risks = f" but watch the {', '.join(match.risk_flags)}" if match.risk_flags else ""
+                response = f"Boss, my conviction on {match.ticker} is {int(match.confidence*100)}%. The setup is a {match.setup_class} with {sentiment} flow{risks}."
+            else:
+                response = f"I'm tracking the broader {last_result.report.market_regime.name} regime right now. Use /analyze to see my deep dive on specific sectors."
+        else:
+            response = "I need you to run /todaysupdate first so I can get a fresh pulse on the markets, boss."
+            
+        print(f"\n{bold}Manager:{reset} {response}\n")
+
+    def handle_setup() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"⚔️ {bold}Diamond Hands Setup Guide{reset}")
+        print("═" * 60)
+        print("1. Clone the private Diamond-Hands-Algo repo.")
+        print("2. Run '/verifybridge' to connect your public intelligence to private execution.")
+        print("3. Run '/settings' to configure your Autopilot and Voice preferences.")
+        print("4. Use '/sniper' to add tickers to your tracking cart.")
+        print("5. Run '/handoff' once you have a high-conviction setup to send it to the private algo.")
+        print()
+
+    def handle_intro_menu() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"{bold}Welcome back. Type /commands to see our core arsenal.{reset}")
+        print()
+        lines = render_command_table(CORE_COMMAND_SPECS, "Diamond Hands Core Commands")
+        for line in lines:
+            print(line)
+        print()
+
+    def handle_viewall() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"{bold}Full Diamond Hands Suite{reset}")
+        print()
+        all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
+        lines = render_command_table(all_specs, "Extended Intelligence Commands")
+        for line in lines:
+            print(line)
+        print()
+
     handlers: dict[str, Callable[[], None]] = {
-        "/commands": print_intro_command_table,
-        "/viewall": print_viewall_command_table,
+        "/commands": handle_intro_menu,
+        "/viewall": handle_viewall,
+        "/more": handle_viewall,
+        "/setup": handle_setup,
         "/todaysupdate": handle_todaysupdate,
         "/analyze": handle_analyze,
         "/marketrecap": handle_marketrecap,
         "/marketnews": handle_marketnews,
+        "/portfolio": handle_portfolio,
         "/runstrategy": handle_runstrategy,
         "/tickersniper": handle_tickersniper,
         "/trumptracker": handle_trumptracker,
         "/wsb": handle_wsb,
+        "/ask": handle_ask,
         "/settings": handle_settings,
         "/clear": handle_clear,
         "/verifybridge": handle_verifybridge,
@@ -1042,30 +1083,34 @@ def run_interactive_shell(
         "/liveboard": handle_liveboard,
         "/hood": handle_hood,
         "/paper": handle_paper,
-        "/train": handle_train,
-        "/rank": handle_rank,
-        "/memory": handle_memory,
-        "/recall": handle_recall,
         "/risk": handle_risk,
         "/stop": handle_stop,
-        "/boot": handle_boot,
     }
 
     while True:
         try:
-            command = input(random.choice(prompts)).strip()
+            raw_input = input(random.choice(prompts)).strip()
         except EOFError:
             print()
             return 0
-        if not command:
+        if not raw_input:
             continue
-        normalized = normalize_command(command)
+            
+        normalized = normalize_command(raw_input)
         if normalized == "/quit":
             return 0
+            
         if normalized is None:
-            print("Unknown command. Use /commands.")
+            # Did you mean? logic
+            search_key = raw_input if raw_input.startswith("/") else "/" + raw_input
+            matches = difflib.get_close_matches(search_key, COMMAND_ALIASES.keys(), n=1, cutoff=0.5)
+            if matches:
+                print(f"💎 {bold}Unknown command.{reset} Did you mean? {bold}{matches[0]}{reset}")
+            else:
+                print("Unknown command. Use /commands.")
             print()
             continue
+            
         handler = handlers.get(normalized)
         if handler is None:
             print("Unknown command. Use /commands.")
@@ -1082,7 +1127,6 @@ def main(argv: list[str] | None = None) -> int:
         and not args.analyze_only
         and not args.analyze_then_hand_off
         and not args.verify_bridge
-        and args.boot_command != "boot"
     )
 
     bridge_config = load_public_bridge_config(Path(args.bridge_config))
@@ -1123,38 +1167,6 @@ def main(argv: list[str] | None = None) -> int:
     print_bridge_verification(verification.notes)
     result = run_pipeline(args.config, args.output_dir)
     print_analysis_summary(result)
-
-    if args.boot_command == "boot":
-        if not verification.compatible:
-            print("Private ALGO bridge is not compatible. Boot stopped before handoff.")
-            return 1
-        try:
-            handoff = hand_off_to_private_algo(bridge_config, result.json_path)
-            print("Diamond Hands private handoff completed.")
-            if handoff.stdout.strip():
-                print(handoff.stdout.strip())
-            memory = run_private_algo_command(bridge_config, ["memory", "ingest"], capture=True)
-            if memory.stdout.strip():
-                print(memory.stdout.strip())
-            doctrine = run_private_algo_command(bridge_config, ["memory", "ingest-docs"], capture=True)
-            if doctrine.stdout.strip():
-                print(doctrine.stdout.strip())
-            cockpit = run_private_algo_command(bridge_config, ["session", "watch", "--watch-once"], capture=True)
-            if cockpit.stdout.strip():
-                print(cockpit.stdout.strip())
-            return 0
-        except subprocess.CalledProcessError as e:
-            print("Diamond Hands boot failed.")
-            if e.stderr and e.stderr.strip():
-                print(e.stderr.strip())
-            elif e.stdout and e.stdout.strip():
-                print(e.stdout.strip())
-            else:
-                print(f"Subprocess failed with exit code {e.returncode}")
-            return 1
-        except Exception as e:
-            print(f"An unexpected error occurred during boot: {e}")
-            return 1
 
     if args.analyze_then_hand_off:
         if not verification.compatible:

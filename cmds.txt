@@ -1,3 +1,4 @@
-/wsb
-
+/setup
+analyze
+todaysupdates
 /quit
