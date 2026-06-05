@@ -3,7 +3,7 @@ universe:
     - SPY
     - QQQ
     - NVDA
-  benchmark: SPY
+  benchmark: SPY x SPX
   volatility_symbol: VIX
 
 timeframes:
