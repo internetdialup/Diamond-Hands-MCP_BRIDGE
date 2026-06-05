@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import random
 import subprocess
 import sys
 import time
@@ -833,7 +834,7 @@ def run_interactive_shell(
 
     def handle_clear() -> None:
         os.system('clear')
-        render_banner(verification.compatible)
+        render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
         print_intro_command_table()
 
     def handle_verifybridge() -> None:
