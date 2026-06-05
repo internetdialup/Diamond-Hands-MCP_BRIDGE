@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from trading_system.bridge_config import PublicBridgeConfig, save_public_bridge_
 @dataclass
 class BridgeVerification:
     repo_exists: bool
-    main_exists: bool
+    cli_exists: bool
     bridge_config_exists: bool
     compatible: bool
     notes: list[str]
@@ -35,20 +36,22 @@ def verify_private_algo_bridge(config: PublicBridgeConfig) -> BridgeVerification
         return BridgeVerification(False, False, False, False, notes)
 
     repo_exists = repo_path.exists()
-    main_exists = (repo_path / "main.py").exists()
     bridge_config_exists = (repo_path / config.private_algo.bridge_config_path).exists()
     pyproject_exists = (repo_path / "pyproject.toml").exists()
-    src_exists = (repo_path / "src").exists()
+    package_exists = (repo_path / "src/trading_algo").exists()
+    installed_cli_exists = shutil.which("trading-algo") is not None
+    module_cli_exists = (repo_path / "src/trading_algo/cli.py").exists()
+    cli_exists = installed_cli_exists or module_cli_exists
 
     if repo_exists:
         notes.append(f"Private ALGO repo found at {repo_path}")
     else:
         notes.append(f"Private ALGO repo missing at {repo_path}")
     
-    if main_exists:
-        notes.append("Private ALGO CLI entrypoint detected.")
+    if cli_exists:
+        notes.append("Private ALGO trading-algo CLI detected.")
     else:
-        notes.append("Private ALGO main.py missing.")
+        notes.append("Private ALGO trading-algo CLI missing.")
         
     if bridge_config_exists:
         notes.append("Private ALGO bridge config detected.")
@@ -57,18 +60,20 @@ def verify_private_algo_bridge(config: PublicBridgeConfig) -> BridgeVerification
 
     if pyproject_exists:
         notes.append("Private ALGO pyproject.toml detected.")
-    
-    if src_exists:
-        notes.append("Private ALGO src/ directory detected.")
     else:
-        notes.append("Private ALGO src/ directory missing (likely broken).")
+        notes.append("Private ALGO pyproject.toml missing.")
+    
+    if package_exists:
+        notes.append("Private ALGO src/trading_algo package detected.")
+    else:
+        notes.append("Private ALGO src/trading_algo package missing (likely broken).")
 
-    compatible = repo_exists and main_exists and bridge_config_exists and src_exists
+    compatible = repo_exists and cli_exists and bridge_config_exists and pyproject_exists and package_exists
     if compatible:
         notes.append("Bridge compatibility check passed.")
     else:
         notes.append("Bridge compatibility check failed.")
-    return BridgeVerification(repo_exists, main_exists, bridge_config_exists, compatible, notes)
+    return BridgeVerification(repo_exists, cli_exists, bridge_config_exists, compatible, notes)
 
 
 def ensure_local_bridge_config(
@@ -114,19 +119,36 @@ def hand_off_to_private_algo(
     if not bridge_config_path.exists():
         raise FileNotFoundError(f"Private ALGO bridge config missing: {bridge_config_path}")
 
+    return run_private_algo_command(
+        config,
+        ["bridge", "run", "--config", str(bridge_config_path), "--artifact", str(artifact_path)],
+        capture=True,
+    )
+
+
+def run_private_algo_command(
+    config: PublicBridgeConfig,
+    command_args: list[str],
+    capture: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    repo_path = resolve_private_algo_repo(config)
+    if repo_path is None:
+        raise FileNotFoundError("No private Diamond-Hands-Algo repo configured.")
+
+    executable = shutil.which("trading-algo")
+    if executable:
+        command = [executable, *command_args]
+        env = os.environ.copy()
+    else:
+        command = [sys.executable, "-m", "trading_algo", *command_args]
+        env = {**os.environ, "PYTHONPATH": str(repo_path / "src")}
+
     return subprocess.run(
-        [
-            sys.executable,
-            "main.py",
-            "--config",
-            str(bridge_config_path),
-            "--artifact",
-            str(artifact_path),
-        ],
+        command,
         cwd=repo_path,
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=subprocess.PIPE if capture else None,
         text=True,
-        env={**os.environ, "PYTHONPATH": str(repo_path / "src")},
+        env=env,
     )

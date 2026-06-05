@@ -47,7 +47,7 @@ You can also use:
 npm run diamondhands
 ```
 
-If you prefer the direct Python fallback:
+If you need the direct Python legacy fallback:
 
 ```bash
 PYTHONPATH=src python3 main.py
@@ -95,6 +95,7 @@ exit            -> /quit
 3. Run `/analyze` if you want the full report.
 4. Run `/verifybridge` to check your private connector.
 5. Run `/handoff` to send the latest artifact to your private repo.
+6. Run `/liveboard`, `/memory`, `/risk`, or `/stop` to route into the private `trading-algo` engine when the private repo is connected.
 
 Not financial advice.
 
@@ -112,10 +113,11 @@ source ~/.zshrc
 Useful direct modes:
 
 ```bash
-PYTHONPATH=src python3 main.py --setup
-PYTHONPATH=src python3 main.py --verify-bridge
-PYTHONPATH=src python3 main.py --analyze-only
-PYTHONPATH=src python3 main.py --analyze-then-hand-off
+diamondhands --setup
+diamondhands --verify-bridge
+diamondhands --analyze-only
+diamondhands --analyze-then-hand-off
+diamondhands boot
 ```
 
 The local bridge state is stored in `config/diamond-hands.local.yaml`, which is intentionally gitignored.

@@ -76,16 +76,19 @@ The current implementation uses these internal modules inside `src/trading_syste
 Run the public bridge with:
 
 ```bash
-PYTHONPATH=src python3 main.py --config config/markets.example.yaml
+diamondhands
 ```
 
 Bridge-specific modes:
 
 ```bash
-PYTHONPATH=src python3 main.py --setup
-PYTHONPATH=src python3 main.py --verify-bridge
-PYTHONPATH=src python3 main.py --analyze-only
-PYTHONPATH=src python3 main.py --analyze-then-hand-off
+diamondhands --setup
+diamondhands --verify-bridge
+diamondhands --analyze-only
+diamondhands --analyze-then-hand-off
+diamondhands boot
 ```
 
 The local bridge state is persisted in `config/diamond-hands.local.yaml` and is not committed.
+
+Use `PYTHONPATH=src python3 main.py ...` only as a legacy local fallback when the editable package entrypoint is unavailable.

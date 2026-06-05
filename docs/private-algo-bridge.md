@@ -34,10 +34,10 @@ It records:
 The public bridge checks:
 
 - whether the private ALGO repo exists
-- whether `main.py` exists in that repo
+- whether the modern `trading-algo` CLI is installed or discoverable from `src/trading_algo`
 - whether the private bridge config exists
 - whether the public handoff path can be used for the private bridge
 
 ## Handoff Rule
 
-The public bridge may generate the analysis artifact and then invoke the private ALGO CLI with the fresh JSON artifact path, but the private repo remains the owner of strict risk gating and eventual execution.
+The public bridge may generate the analysis artifact and then invoke `trading-algo bridge run` with the fresh JSON artifact path, but the private repo remains the owner of strict risk gating and eventual execution.

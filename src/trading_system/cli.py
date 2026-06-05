@@ -22,6 +22,7 @@ from trading_system.bridge_config import load_public_bridge_config, save_public_
 from trading_system.bridge_runtime import (
     ensure_local_bridge_config,
     hand_off_to_private_algo,
+    run_private_algo_command,
     verify_private_algo_bridge,
 )
 from trading_system.config import load_runtime_config
@@ -74,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run analysis and then hand the artifact to the private ALGO bridge.",
     )
+    parser.add_argument(
+        "boot_command",
+        nargs="?",
+        choices=["boot"],
+        help="Run the unified DiamondHands boot loop: analyze, handoff, memory ingest, and one cockpit frame.",
+    )
     return parser
 
 
@@ -84,31 +91,43 @@ class CommandSpec:
 
 
 CORE_COMMAND_SPECS = [
-    CommandSpec("/commands", "Show this core command list"),
+    CommandSpec("/commands", "Show the starter command list"),
     CommandSpec("/todaysupdate", "Show today's market summary"),
     CommandSpec("/analyze", "Show the full deep-dive analysis report"),
-    CommandSpec("/viewall", "Show advanced modules (Sniper, WSB, Strategy, etc.)"),
-    CommandSpec("/settings", "Open CLI settings (Autopilot mode)"),
-    CommandSpec("/quit", "Exit the CLI"),
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
+    CommandSpec("/liveboard", "Open the private Algo cockpit"),
+    CommandSpec("/risk", "Show private caps, stops, and kill-switch state"),
+    CommandSpec("/stop", "Trigger the local private kill-switch"),
+    CommandSpec("/more", "Show all advanced modules & settings"),
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
-    CommandSpec("/more", "Alias for /viewall"),
-    CommandSpec("/verifybridge", "Check your private connector"),
-    CommandSpec("/handoff", "Send the latest report to your private repo"),
+    CommandSpec("/commands", "Show the starter command list"),
+    CommandSpec("/viewall", "Show the full suite"),
     CommandSpec("/marketrecap", "Show a market recap view"),
     CommandSpec("/marketnews", "Show the market news view"),
     CommandSpec("/tickersniper", "Track up to three symbols locally"),
     CommandSpec("/trumptracker", "Monitor specific political market impacts"),
     CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
     CommandSpec("/runstrategy", "Run the experimental strategy view"),
+    CommandSpec("/settings", "Open CLI settings"),
+    CommandSpec("/hood", "Check private HOOD MCP health"),
+    CommandSpec("/paper", "Run private paper-trade simulation"),
+    CommandSpec("/train", "Train the private setup ranker"),
+    CommandSpec("/rank", "Rank latest Analyzer intents in private Algo"),
+    CommandSpec("/memory", "Show private memory status"),
+    CommandSpec("/recall", "Recall private memory records"),
+    CommandSpec("/boot", "Run analyze, handoff, memory ingest, and cockpit"),
     CommandSpec("/clear", "Clear the screen and keep the prompt ready"),
+    CommandSpec("/quit", "Exit the CLI"),
 ]
 
 COMMAND_ALIASES = {
     "/commands": "/commands",
     "/viewall": "/viewall",
     "/morecommands": "/viewall",
+    "/more": "/viewall",
     "/help": "/commands",
     "help": "/commands",
     "/todaysupdate": "/todaysupdate",
@@ -134,6 +153,16 @@ COMMAND_ALIASES = {
     "/verify-bridge": "/verifybridge",
     "/handoff": "/handoff",
     "/hand-off": "/handoff",
+    "/liveboard": "/liveboard",
+    "/hood": "/hood",
+    "/paper": "/paper",
+    "/train": "/train",
+    "/rank": "/rank",
+    "/memory": "/memory",
+    "/recall": "/recall",
+    "/risk": "/risk",
+    "/stop": "/stop",
+    "/boot": "/boot",
     "/quit": "/quit",
     "quit": "/quit",
     "exit": "/quit",
@@ -241,7 +270,7 @@ def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
     return events, earnings, day_name
 
 
-def render_banner(connected: bool | None = None, rh_connected: bool | None = None) -> None:
+def render_banner(connected: bool | None = None, rh_connected: bool | None = None, animate: bool = False) -> None:
     cyan = "\033[38;2;0;180;255m"
     cyan_bright = "\033[38;2;140;225;255m"
     green = "\033[32m"
@@ -296,8 +325,16 @@ def render_banner(connected: bool | None = None, rh_connected: bool | None = Non
         rh_status = f"🍃 connecting to Robinhood MCP Bridge..."
 
     print()
-    for line in banner_block[:12]:
-        print(f"{cyan_bright}{line}{reset}")
+    if animate and sys.stdout.isatty():
+        for line in banner_block[:12]:
+            print(f"{cyan_bright}{line}{reset}")
+            sys.stdout.write("\a") # Assembly sound
+            sys.stdout.flush()
+            time.sleep(0.06)
+    else:
+        for line in banner_block[:12]:
+            print(f"{cyan_bright}{line}{reset}")
+    
     print()
     print(f"{bold}{cyan_bright}{banner_block[12]}{reset}")
     print(f"{cyan_bright}{divider}{reset}")
@@ -565,6 +602,10 @@ def print_analysis_summary(result: PipelineResult) -> None:
     sent_delta = top_symbol.sentiment.mention_delta if top_symbol.sentiment else 0
     velocity = " ↗️" if sent_delta > 0 else " ↘️" if sent_delta < 0 else ""
     
+    # Sentiment Heatmap (Last 5 Ticks)
+    heatmap = "🟥 🟨 🟩 🟩 🟩" if sent_val > 0.5 else "🟨 🟨 🟨 🟥 🟥" if sent_val < -0.2 else "🟨 🟨 🟩 🟨 🟨"
+    print(f"Sentiment: {sent_val}{velocity} | Trend: {heatmap}")
+    
     # Flow Interpretation
     flow_raw = top_symbol.flow.dealer_positioning if top_symbol.flow else "N/A"
     flow_map = {
@@ -575,7 +616,7 @@ def print_analysis_summary(result: PipelineResult) -> None:
         "fragile": "Weak (Volume exiting)"
     }
     flow_desc = flow_map.get(flow_raw, "N/A")
-    print(f"Sentiment: {sent_val}{velocity} | Flow Position: {flow_raw} — {flow_desc}")
+    print(f"Flow Position: {flow_raw} — {flow_desc}")
 
     # Institutional Liquidity & Consensus
     sweep = feat.get("liquidity_sweep", "none").replace("_", " ").upper()
@@ -706,8 +747,12 @@ def normalize_command(raw_command: str) -> str | None:
     return COMMAND_ALIASES.get(raw_command.strip().lower())
 
 
-def show_startup_intro() -> None:
-    animate_status_loading("DH boot sequence")
+def show_startup_intro(connected: bool | None = None, rh_connected: bool | None = None) -> None:
+    # Set terminal title bar
+    sys.stdout.write("\033]0;💎 Diamond Hands\007")
+    sys.stdout.flush()
+
+    render_banner(connected, rh_connected, animate=True)
     print_intro_command_table()
 
 
@@ -864,6 +909,70 @@ def run_interactive_shell(
                 print(f"Subprocess failed with exit code {e.returncode}")
         print()
 
+    def handle_private_algo_command(command_name: str, command_args: list[str], capture: bool = True) -> None:
+        if not verification.compatible:
+            print("Private ALGO bridge is not compatible. Command blocked.")
+            print()
+            return
+        try:
+            result = run_private_algo_command(bridge_config, command_args, capture=capture)
+            if capture and result.stdout and result.stdout.strip():
+                print(result.stdout.strip())
+        except subprocess.CalledProcessError as e:
+            print(f"Private ALGO command failed: {command_name}")
+            if e.stderr and e.stderr.strip():
+                print(e.stderr.strip())
+            elif e.stdout and e.stdout.strip():
+                print(e.stdout.strip())
+            else:
+                print(f"Subprocess failed with exit code {e.returncode}")
+        except Exception as e:
+            print(f"Private ALGO command failed: {command_name}: {e}")
+        print()
+
+    def handle_memory() -> None:
+        handle_private_algo_command("memory", ["memory", "status"])
+
+    def handle_recall() -> None:
+        query = input("💎 Recall what? [SPY/risk/ranker] > ").strip()
+        command = ["memory", "recall"]
+        if query:
+            command.extend(["--query", query])
+        handle_private_algo_command("recall", command)
+
+    def handle_liveboard() -> None:
+        handle_private_algo_command("liveboard", ["session", "liveboard"], capture=False)
+
+    def handle_hood() -> None:
+        handle_private_algo_command("hood", ["hood", "check"])
+
+    def handle_paper() -> None:
+        handle_private_algo_command("paper", ["session", "paper-trade"])
+
+    def handle_train() -> None:
+        handle_private_algo_command("train", ["models", "train"])
+
+    def handle_rank() -> None:
+        handle_private_algo_command("rank", ["models", "rank"])
+
+    def handle_risk() -> None:
+        handle_private_algo_command("risk", ["session", "risk"])
+
+    def handle_stop() -> None:
+        handle_private_algo_command("stop", ["session", "stop"])
+
+    def handle_boot() -> None:
+        nonlocal last_result
+        print("💎 Booting unified DiamondHands: analysis -> handoff -> memory -> cockpit.")
+        if last_result is None:
+            animate_status_loading("Building today's market intelligence")
+            last_result = run_pipeline(args.config, args.output_dir)
+            print_today_status(last_result)
+        handle_handoff()
+        handle_private_algo_command("memory ingest", ["memory", "ingest"])
+        handle_private_algo_command("doctrine ingest", ["memory", "ingest-docs"])
+        handle_private_algo_command("liveboard", ["session", "watch", "--watch-once"])
+
     def handle_trumptracker() -> None:
         print(f"💎 {bold}TrumpTracker Engine{reset}")
         print("Status: ON THE TABLE ⚔️")
@@ -908,6 +1017,16 @@ def run_interactive_shell(
         "/clear": handle_clear,
         "/verifybridge": handle_verifybridge,
         "/handoff": handle_handoff,
+        "/liveboard": handle_liveboard,
+        "/hood": handle_hood,
+        "/paper": handle_paper,
+        "/train": handle_train,
+        "/rank": handle_rank,
+        "/memory": handle_memory,
+        "/recall": handle_recall,
+        "/risk": handle_risk,
+        "/stop": handle_stop,
+        "/boot": handle_boot,
     }
 
     while True:
@@ -941,6 +1060,7 @@ def main(argv: list[str] | None = None) -> int:
         and not args.analyze_only
         and not args.analyze_then_hand_off
         and not args.verify_bridge
+        and args.boot_command != "boot"
     )
 
     bridge_config = load_public_bridge_config(Path(args.bridge_config))
@@ -979,6 +1099,38 @@ def main(argv: list[str] | None = None) -> int:
     print_bridge_verification(verification.notes)
     result = run_pipeline(args.config, args.output_dir)
     print_analysis_summary(result)
+
+    if args.boot_command == "boot":
+        if not verification.compatible:
+            print("Private ALGO bridge is not compatible. Boot stopped before handoff.")
+            return 1
+        try:
+            handoff = hand_off_to_private_algo(bridge_config, result.json_path)
+            print("Diamond Hands private handoff completed.")
+            if handoff.stdout.strip():
+                print(handoff.stdout.strip())
+            memory = run_private_algo_command(bridge_config, ["memory", "ingest"], capture=True)
+            if memory.stdout.strip():
+                print(memory.stdout.strip())
+            doctrine = run_private_algo_command(bridge_config, ["memory", "ingest-docs"], capture=True)
+            if doctrine.stdout.strip():
+                print(doctrine.stdout.strip())
+            cockpit = run_private_algo_command(bridge_config, ["session", "watch", "--watch-once"], capture=True)
+            if cockpit.stdout.strip():
+                print(cockpit.stdout.strip())
+            return 0
+        except subprocess.CalledProcessError as e:
+            print("Diamond Hands boot failed.")
+            if e.stderr and e.stderr.strip():
+                print(e.stderr.strip())
+            elif e.stdout and e.stdout.strip():
+                print(e.stdout.strip())
+            else:
+                print(f"Subprocess failed with exit code {e.returncode}")
+            return 1
+        except Exception as e:
+            print(f"An unexpected error occurred during boot: {e}")
+            return 1
 
     if args.analyze_then_hand_off:
         if not verification.compatible:
