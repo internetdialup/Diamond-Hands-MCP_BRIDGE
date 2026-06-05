@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import os
 import random
 import subprocess
@@ -295,7 +296,7 @@ def render_banner(connected: bool | None = None, rh_connected: bool | None = Non
         "  DIAMOND HANDS · MCP BRIDGE",
     ]
     emoji_line = "         💎🤝"
-    byline = "  by: internetdialup ✌️ dmndhnds.app / dmndhnds.lol"
+    byline = "  by: internetdialup ✌️ 💎🙌 dmndhnds.app / dmndhnds.lol"
     divider = "  ───────────────────────────"
     tagline = "  Robinhood-first public bridge for market intelligence and private ALGO handoff."
     manager_tag = f"  {bold}{green}⚔️ I'm your personal hedge-fund manager{reset}"
@@ -534,8 +535,6 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
             emoji = "📈"
             rocket = "🚀 "
             decider = f"{green}CALL{reset}"
-            if symbol.confidence >= 0.85:
-                play_alert(f"Boss, we have a high confidence call setup on {symbol.ticker}")
         elif bias == "bearish":
             emoji = "📉"
             rocket = "   "
@@ -742,7 +741,22 @@ def prompt_yes_no(prompt: str) -> bool:
 
 
 def normalize_command(raw_command: str) -> str | None:
-    return COMMAND_ALIASES.get(raw_command.strip().lower())
+    raw = raw_command.strip().lower()
+    if not raw.startswith("/"):
+        raw = "/" + raw
+    
+    # Try exact match first
+    if raw in COMMAND_ALIASES:
+        return COMMAND_ALIASES[raw]
+        
+    # Try fuzzy match
+    matches = difflib.get_close_matches(raw, COMMAND_ALIASES.keys(), n=1, cutoff=0.7)
+    if matches:
+        # Give a small hint about auto-correction
+        print(f"💎 (Auto-corrected {raw} to {matches[0]})")
+        return COMMAND_ALIASES[matches[0]]
+        
+    return None
 
 
 def show_startup_intro(connected: bool | None = None, rh_connected: bool | None = None) -> None:
@@ -761,7 +775,7 @@ def run_interactive_shell(
 ) -> int:
     last_result: PipelineResult | None = None
     tracked_tickers: list[str] = ["$SPY", "$QQQ"]
-    voice_enabled: bool = True # Default ON
+    voice_enabled: bool = False # Default OFF
     bold = "\033[1m"
     reset = "\033[0m"
     show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed)
@@ -769,6 +783,15 @@ def run_interactive_shell(
     if bridge_status_note:
         print(bridge_status_note)
         print()
+
+    prompts = [
+        "💎 What's our next move, boss? > ",
+        "💎 King to f9, check. > ",
+        "💎 What's on the shopping list? > ",
+        "💎 Awaiting instructions. > ",
+        "💎 Ready for alpha. Next move? > ",
+        "💎 Standing by, boss. > "
+    ]
 
     def handle_todaysupdate() -> None:
         nonlocal last_result
@@ -1030,7 +1053,7 @@ def run_interactive_shell(
 
     while True:
         try:
-            command = input("💎 What's our next move, boss? > ").strip()
+            command = input(random.choice(prompts)).strip()
         except EOFError:
             print()
             return 0
