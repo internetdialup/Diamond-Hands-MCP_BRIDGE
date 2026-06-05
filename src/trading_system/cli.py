@@ -91,20 +91,18 @@ class CommandSpec:
 
 
 CORE_COMMAND_SPECS = [
-    CommandSpec("/commands", "Show the starter command list"),
     CommandSpec("/todaysupdate", "Show today's market summary"),
     CommandSpec("/analyze", "Show the full deep-dive analysis report"),
-    CommandSpec("/verifybridge", "Check your private connector"),
-    CommandSpec("/handoff", "Send the latest report to your private repo"),
-    CommandSpec("/liveboard", "Open the private Algo cockpit"),
-    CommandSpec("/risk", "Show private caps, stops, and kill-switch state"),
-    CommandSpec("/stop", "Trigger the local private kill-switch"),
+    CommandSpec("/portfolio", "View buying power and current positions"),
+    CommandSpec("/ask", "Ask your manager about specific tickers"),
     CommandSpec("/more", "Show all advanced modules & settings"),
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
-    CommandSpec("/commands", "Show the starter command list"),
+    CommandSpec("/commands", "Show the full command list"),
     CommandSpec("/viewall", "Show the full suite"),
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
     CommandSpec("/marketrecap", "Show a market recap view"),
     CommandSpec("/marketnews", "Show the market news view"),
     CommandSpec("/tickersniper", "Track up to three symbols locally"),
@@ -112,13 +110,6 @@ EXPERIMENTAL_COMMAND_SPECS = [
     CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
     CommandSpec("/runstrategy", "Run the experimental strategy view"),
     CommandSpec("/settings", "Open CLI settings"),
-    CommandSpec("/hood", "Check private HOOD MCP health"),
-    CommandSpec("/paper", "Run private paper-trade simulation"),
-    CommandSpec("/train", "Train the private setup ranker"),
-    CommandSpec("/rank", "Rank latest Analyzer intents in private Algo"),
-    CommandSpec("/memory", "Show private memory status"),
-    CommandSpec("/recall", "Recall private memory records"),
-    CommandSpec("/boot", "Run analyze, handoff, memory ingest, and cockpit"),
     CommandSpec("/clear", "Clear the screen and keep the prompt ready"),
     CommandSpec("/quit", "Exit the CLI"),
 ]
@@ -425,10 +416,9 @@ def render_command_table(command_specs: list[CommandSpec], title: str) -> list[s
 def print_intro_command_table() -> None:
     bold = "\033[1m"
     reset = "\033[0m"
-    print(f"{bold}Welcome back. Type /commands to see our full arsenal.{reset}")
+    print(f"{bold}Welcome back. Type /commands to see our core arsenal.{reset}")
     print()
-    all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
-    lines = render_command_table(all_specs, "Diamond Hands Command Suite")
+    lines = render_command_table(CORE_COMMAND_SPECS, "Diamond Hands Core Commands")
     if not sys.stdout.isatty():
         for line in lines:
             print(line)
@@ -437,12 +427,20 @@ def print_intro_command_table() -> None:
 
     for line in lines:
         print(line)
-        time.sleep(0.03)
+        # Optimized speed
     print()
 
 
 def print_viewall_command_table() -> None:
-    print_intro_command_table()
+    bold = "\033[1m"
+    reset = "\033[0m"
+    print(f"{bold}Full Diamond Hands Suite{reset}")
+    print()
+    all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
+    lines = render_command_table(all_specs, "Extended Intelligence Commands")
+    for line in lines:
+        print(line)
+    print()
 
 
 def print_robinhood_onboarding(mcp_url: str, completed: bool) -> None:
