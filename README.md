@@ -1,12 +1,14 @@
 # Diamond-Hands-MCP_BRIDGE
 
-Public Robinhood-first CLI for market review and private connector handoff.
+Public Robinhood-first bridge CLI for market intelligence and private connector handoff.
 
-## What This Is
+DMNDHNDS is not Financial Advice. Use at your own Risk. Don't end up being the exit liquidity. Paper trade your algos, back-test, use this to build and strengthen your alpha and MCP connectors.
+
+## What This Repo does 
 
 This repository is the public `Diamond Hands` bridge product. It reviews market structure, sentiment, flow, and setup quality, then writes artifacts that a user-owned private repo can consume.
 
-It is not the trade execution engine.
+It is not the final execution engine. This is only meant as a connector to your private repo's to build a stronger edge.
 
 ## Public and Private Split
 
