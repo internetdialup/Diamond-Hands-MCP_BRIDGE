@@ -18,7 +18,7 @@ from trading_system.data.providers import build_data_provider
 from trading_system.features.flow import build_flow_contract
 from trading_system.features.regime import classify_market_regime
 from trading_system.features.sentiment import build_sentiment_contract
-from trading_system.features.technical import atr, bollinger_pct_b, macd, momentum_score, realized_volatility, rsi
+from trading_system.features.technical import atr, bollinger_pct_b, liquidity_sweep, macd, momentum_score, realized_volatility, rsi
 from trading_system.models.fusion import direction_bias_from_pattern, fuse_confidence, technical_posture_from_scores
 from trading_system.models.pattern import classify_pattern
 
@@ -91,6 +91,8 @@ class DailyPipeline:
                 no_trade_flags.append(f"{symbol}: confidence or regime filter")
 
             direction_bias = direction_bias_from_pattern(pattern_contract.setup_class)
+            sweep = liquidity_sweep(symbol_snapshot.bars)
+            
             supporting_features = {
                 "rsi": round(current_rsi, 4),
                 "bollinger_pct_b": round(bb_pct_b, 4),
@@ -101,6 +103,13 @@ class DailyPipeline:
                 "sentiment_score": sentiment_contract.score,
                 "flow_score": flow_contract.score,
                 "fear_greed": snapshot.fear_greed_index,
+                "liquidity_sweep": sweep,
+                "votes": {
+                    "regime": "YES" if regime.score > 0.2 else "NO",
+                    "technical": "YES" if technical_score > 0.2 else "NO",
+                    "flow": "YES" if flow_contract.score > 0.5 else "NO",
+                    "sentiment": "YES" if sentiment_contract.score > 0.5 else "NO",
+                }
             }
 
             symbol_report = SymbolReport(
@@ -142,15 +151,18 @@ class DailyPipeline:
         top_symbol = max(symbol_reports, key=lambda item: item.confidence)
         # Generate News (Mocking top 12)
         top_12_news = [
-            NewsItem(topic='Market Regime', sentiment_score=regime.score, summary=regime.summary),
-            NewsItem(topic=f'Benchmark: {self.config.universe.benchmark}', sentiment_score=0.1, summary='Tracking core index performance.'),
+            NewsItem(topic='Market Vibe', sentiment_score=regime.score, summary=regime.summary),
+            NewsItem(topic='Global Pulse ❤️', sentiment_score=-0.8, summary='Ceasefire in IRAN bad, or some shit'),
+            NewsItem(topic='US Pulse ❤️', sentiment_score=-0.2, summary='Not sure what Don Cheeto is up to; type /trumptracker'),
+            NewsItem(topic='Money Printer', sentiment_score=0.9, summary='Fed printer go brrrr. Tech stocks soaring.'),
+            NewsItem(topic='Retail Chaos', sentiment_score=0.5, summary='Retail traders piling into options. Gamma squeeze imminent.'),
         ]
-        for symbol in symbol_reports[:10]:
+        for symbol in symbol_reports[:7]:
             top_12_news.append(
                 NewsItem(
-                    topic=f'Symbol: {symbol.ticker}', 
+                    topic=f'Tale of {symbol.ticker}', 
                     sentiment_score=symbol.sentiment.score if symbol.sentiment else 0.0, 
-                    summary=f'{symbol.technical_posture} posture with {symbol.setup_class} setup.'
+                    summary=f'Looking {symbol.direction_bias} with {symbol.technical_posture} energy.'
                 )
             )
         while len(top_12_news) < 12:

@@ -1,19 +1,19 @@
 # Diamond-Hands-MCP_BRIDGE
 
-Public Robinhood-first bridge CLI for market intelligence and private trading handoff.
+Public Robinhood-first CLI for market review and private connector handoff.
 
-## What This Repo Is
+## What This Is
 
-This repository is the public `Diamond Hands` bridge product. It analyzes market structure, sentiment, flow, and setup quality, then emits intelligence artifacts that a user-owned private ALGO repo can consume.
+This repository is the public `Diamond Hands` bridge product. It reviews market structure, sentiment, flow, and setup quality, then writes artifacts that a user-owned private repo can consume.
 
-It is not the final execution engine.
+It is not the trade execution engine.
 
-## Product Split
+## Public and Private Split
 
 - `Diamond-Hands-MCP_BRIDGE` is public and forkable.
 - `Diamond-Hands-Algo` is private and execution-side.
-- The public bridge helps users analyze, connect, and hand off.
-- The private ALGO repo owns proprietary filters, hard risk rules, and eventual Robinhood trade execution.
+- The public bridge helps users review the market, verify their setup, and hand off artifacts.
+- The private repo owns proprietary filters, risk rules, and eventual Robinhood trade execution.
 
 ## Robinhood-First Workflow
 
@@ -23,47 +23,62 @@ The bridge is currently centered on Robinhood Agentic Trading and its MCP endpoi
 
 The public CLI explains the Robinhood onboarding path and then helps the user attach their own private ALGO repo.
 
-## Single Public CLI
+## Quick Start
 
-Use the terminal CLI as the primary way to start Diamond Hands.
-
-From the repo root, install the editable package with `python3 -m pip`:
+Install the editable package from the repo root:
 
 ```bash
 python3 -m pip install --user -e .
 ```
 
-Start the CLI:
+Launch the CLI:
 
 ```bash
 diamondhands
 ```
 
-This opens the interactive Diamond Hands shell in your terminal. The prompt is:
+Not financial advice.
 
-```text
-diamond-hands>
+You can also use:
+
+```bash
+npm run diamondhands
 ```
 
-### Terminal CLI Walkthrough
+If you prefer the direct Python fallback:
 
-When the shell opens, you can type `/commands` at any time to reopen the command desk and see the available slash commands.
+```bash
+PYTHONPATH=src python3 main.py
+```
 
-Primary interactive commands:
+## Starter Commands
+
+When the shell opens, type `/commands` to show the starter command list again.
+
+Core commands:
 
 ```text
 /commands      Show the command desk
-/todaysupdate  Show the market desk and top 10 events
-/analyze       Run the full Diamond Hands daily analysis
-/verifybridge  Check private ALGO bridge compatibility
-/handoff       Send the current artifact to Diamond-Hands-Algo
-/quit          Exit the DH CLI session
+/todaysupdate  Show today's market summary
+/analyze       Show the full analysis report
+/verifybridge  Check your private connector
+/handoff       Send the latest artifact to Diamond-Hands-Algo
+/quit          Exit the CLI
 ```
 
-Supported aliases:
+Extended commands stay available behind:
+
+```text
+/viewall
+```
+
+Use `/clear` to clear old CLI output without replaying the full startup screen.
+
+Compatibility aliases:
 
 ```text
 /help           -> /commands
+/morecommands   -> /viewall
 /today-status   -> /todaysupdate
 /verify-bridge  -> /verifybridge
 /hand-off       -> /handoff
@@ -71,7 +86,17 @@ quit            -> /quit
 exit            -> /quit
 ```
 
-### macOS Notes
+## Typical Flow
+
+1. Start the CLI with `diamondhands`.
+2. Run `/todaysupdate` for the current market summary.
+3. Run `/analyze` if you want the full report.
+4. Run `/verifybridge` to check your private connector.
+5. Run `/handoff` to send the latest artifact to your private repo.
+
+Not financial advice.
+
+## macOS Notes
 
 On some Macs, `pip` is not available as a command even when `python3` is installed. Use `python3 -m pip` instead.
 
@@ -82,25 +107,7 @@ echo 'export PATH="$HOME/Library/Python/3.9/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-If you want one command that installs and launches the CLI from the repo, use:
-
-```bash
-./scripts/start_diamondhands.sh
-```
-
-Alternative entrypoints:
-
-```bash
-npm run diamondhands
-```
-
-Fallback dev entrypoint:
-
-```bash
-PYTHONPATH=src python3 main.py
-```
-
-Useful modes:
+Useful direct modes:
 
 ```bash
 PYTHONPATH=src python3 main.py --setup
@@ -129,18 +136,14 @@ Users are expected to:
 3. connect their agent to Robinhood Agentic Trading
 4. use the public bridge output as the input to their private execution stack
 
-## TL;DR & ELI5 (The "Recipe Robot")
+## ELI5
 
-### TL;DR
-This project is a **public market intelligence engine**. It analyzes market data and identifies trading setups, then packages its findings into a machine-readable artifact for a **private** repository to execute. It provides the analysis but never manages your money or keys.
-
-### ELI5 (How it Works)
 Imagine you have two robots working together to bake cookies:
 
 1.  **The Recipe Robot (This Project):** This robot's only job is to look at the ingredients in the pantry (market data), read the cookbook (technical indicators), and figure out the perfect recipe for today. It writes the recipe down on a card and hands it off. It *never* touches the oven.
 2.  **The Chef Robot (Your Private Repo):** This robot takes that recipe card, checks if it's safe (risk rules), and then actually puts the cookies in the oven (makes the trades on Robinhood).
 
-By keeping the **Recipe Robot** public, you can share the "math" with the community without ever risking your secret passwords or personal money rules.
+By keeping the **Recipe Robot** public, you can share the analysis layer without exposing secrets or private execution rules.
 
 ## Key Docs
 

@@ -24,41 +24,41 @@ def classify_market_regime(snapshot: MarketSnapshot) -> RegimeFeatures:
     drivers: list[str] = []
     if benchmark_momentum > 0.02:
         score += 0.35
-        drivers.append("benchmark momentum positive")
+        drivers.append("The overall market is trending up")
     elif benchmark_momentum < -0.02:
         score -= 0.35
-        drivers.append("benchmark momentum negative")
+        drivers.append("The overall market is cooling off")
 
     if snapshot.fear_greed_index >= 60:
         score += 0.2
-        drivers.append("fear and greed risk-on")
+        drivers.append("Investors are feeling greedy")
     elif snapshot.fear_greed_index <= 40:
         score -= 0.2
-        drivers.append("fear and greed risk-off")
+        drivers.append("Investors are feeling fearful")
 
     if volatility_level <= 20 and volatility_momentum <= 0:
         score += 0.2
-        drivers.append("vix contained")
+        drivers.append("Market volatility is low")
     elif volatility_level >= 24 or volatility_momentum > 0.04:
         score -= 0.25
-        drivers.append("vix elevated")
+        drivers.append("Market volatility is picking up")
 
     if realized_vol <= 0.2:
         score += 0.1
-        drivers.append("realized volatility orderly")
+        drivers.append("Price action is nice and orderly")
     elif realized_vol >= 0.35:
         score -= 0.1
-        drivers.append("realized volatility stressed")
+        drivers.append("Price action is looking stressed")
 
     if score >= 0.3:
         name = "Risk On"
-        summary = "Trend and volatility inputs support continuation setups."
+        summary = "The market is looking strong. It's a good time to ride the trend."
     elif score <= -0.2:
         name = "Risk Off"
-        summary = "Volatility and breadth conditions argue for defensive posture."
+        summary = "Things are getting choppy. Time to play defense and protect capital."
     else:
         name = "Transitional"
-        summary = "Signals are mixed. Prioritize selectivity and tighter risk filters."
+        summary = "The market can't make up its mind. Be picky with your trades."
 
     return RegimeFeatures(
         score=max(min(score, 1.0), -1.0),

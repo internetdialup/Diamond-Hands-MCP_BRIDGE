@@ -11,6 +11,7 @@ dist/
 build/
 outputs/
 config/diamond-hands.local.yaml
+TODO.private.md
 
 data/raw/
 data/intermediate/

@@ -128,3 +128,25 @@ def mean_reversion_score(bars: list[PriceBar], window: int = 20) -> float:
     average = mean(window_values)
     deviation = pstdev(window_values) or 1e-6
     return (average - values[-1]) / deviation
+
+
+def liquidity_sweep(bars: list[PriceBar], window: int = 20) -> str:
+    if len(bars) < window + 1:
+        return "none"
+    
+    # Previous range high/low
+    prior_bars = bars[-window-1:-1]
+    range_high = max(b.high for b in prior_bars)
+    range_low = min(b.low for b in prior_bars)
+    
+    current = bars[-1]
+    
+    # Bearish Sweep: Price takes range high, but closes back below it
+    if current.high > range_high and current.close < range_high:
+        return "bearish_sweep"
+    
+    # Bullish Sweep: Price takes range low, but closes back above it
+    if current.low < range_low and current.close > range_low:
+        return "bullish_sweep"
+        
+    return "none"

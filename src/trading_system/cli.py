@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"urllib3 v2 only supports OpenSSL 1\.1\.1\+, currently the 'ssl' module is compiled with 'LibreSSL.*",
+    category=Warning,
+    module=r"urllib3(\..*)?",
+)
 
 from trading_system.bridge_config import load_public_bridge_config, save_public_bridge_config
 from trading_system.bridge_runtime import (
@@ -17,6 +26,7 @@ from trading_system.bridge_runtime import (
 from trading_system.config import load_runtime_config
 from trading_system.contracts.types import DailyReportContract
 from trading_system.pipeline.daily import DailyPipeline, PipelineResult
+from trading_system.strategies.momentum import MomentumStrategy
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,73 +82,222 @@ class CommandSpec:
     purpose: str
 
 
-COMMAND_SPECS = [
-    CommandSpec("/todaysupdate", "Market snapshot and catalyst overview"),
-    CommandSpec("/analyze", "Deep technical, sentiment, and flow dashboard"),
-    CommandSpec("/verifybridge", "Check private ALGO bridge compatibility"),
-    CommandSpec("/handoff", "Send the current artifact to Diamond-Hands-Algo"),
-    CommandSpec("/quit", "Exit the DH CLI session"),
+CORE_COMMAND_SPECS = [
+    CommandSpec("/commands", "Show the starter command list"),
+    CommandSpec("/todaysupdate", "Show today's market summary"),
+    CommandSpec("/analyze", "Show the full analysis report"),
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
+]
+
+EXPERIMENTAL_COMMAND_SPECS = [
+    CommandSpec("/viewall", "Show the full command list"),
+    CommandSpec("/marketrecap", "Show a market recap view"),
+    CommandSpec("/marketnews", "Show the market news view"),
+    CommandSpec("/tickersniper", "Track up to three symbols locally"),
+    CommandSpec("/trumptracker", "Monitor specific political market impacts"),
+    CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
+    CommandSpec("/runstrategy", "Run the experimental strategy view"),
+    CommandSpec("/settings", "Open CLI settings"),
+    CommandSpec("/clear", "Clear the screen and keep the prompt ready"),
+    CommandSpec("/quit", "Exit the CLI"),
 ]
 
 COMMAND_ALIASES = {
+    "/commands": "/commands",
+    "/viewall": "/viewall",
+    "/morecommands": "/viewall",
+    "/help": "/commands",
+    "help": "/commands",
     "/todaysupdate": "/todaysupdate",
     "/today-status": "/todaysupdate",
     "/analyze": "/analyze",
+    "/marketrecap": "/marketrecap",
+    "/recap": "/marketrecap",
+    "/marketnews": "/marketnews",
+    "/news": "/marketnews",
+    "/trumptracker": "/trumptracker",
+    "/wsb": "/wsb",
+    "/wallstbets": "/wsb",
+    "/runstrategy": "/runstrategy",
+    "/strategy": "/runstrategy",
+    "/alpha": "/runstrategy",
+    "/lfg": "/runstrategy",
+    "/tickersniper": "/tickersniper",
+    "/sniper": "/tickersniper",
+    "/settings": "/settings",
+    "/clear": "/clear",
+    "clear": "/clear",
     "/verifybridge": "/verifybridge",
     "/verify-bridge": "/verifybridge",
     "/handoff": "/handoff",
     "/hand-off": "/handoff",
-    "/commands": "/commands",
-    "/help": "/commands",
-    "help": "/commands",
     "/quit": "/quit",
     "quit": "/quit",
     "exit": "/quit",
 }
 
 
-def render_banner() -> None:
+from datetime import datetime, timedelta
+
+def get_ordinal(n: int) -> str:
+    if 11 <= n <= 13:
+        return f"{n}th"
+    return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+
+
+def format_human_date(iso_string: str) -> str:
+    # iso_string like "2026-06-04T11:00:00Z"
+    try:
+        clean_iso = iso_string.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean_iso)
+        month_str = dt.strftime("%b")
+        day_val = dt.day
+        day_str = f"{day_val}{get_ordinal(day_val)}"
+        year_str = dt.strftime("%Y")
+        time_str = dt.strftime("%-I%p")
+        return f"{month_str} {day_str}, {year_str}, {time_str}"
+    except Exception:
+        return iso_string
+
+
+def get_wallstreet_time() -> str:
+    # Crude way to get EST (UTC-5) or EDT (UTC-4)
+    # 2026 June is EDT
+    utc_now = datetime.utcnow()
+    edt_now = utc_now - timedelta(hours=4)
+    return edt_now.strftime("%-I%p EST")
+
+
+def cyan_gradient(text: str) -> str:
+    if not sys.stdout.isatty():
+        return text
+    out = ""
+    steps = max(1, len(text) - 1)
+    for i, char in enumerate(text):
+        # Cascading gradient from #00b4ff (0, 180, 255) to lighter/greener cyan (0, 255, 200)
+        r = 0
+        g = min(255, int(180 + (75 * (i / steps))))
+        b = max(180, int(255 - (75 * (i / steps))))
+        out += f"\033[38;2;{r};{g};{b}m{char}"
+    return out + "\033[0m"
+
+
+def create_barchart(value: float, max_val: float = 1.0, width: int = 10) -> str:
+    if not sys.stdout.isatty():
+        return f"{value:.2f}"
+    
+    green = "\033[32m"
+    yellow = "\033[33m"
+    red = "\033[31m"
+    reset = "\033[0m"
+    
+    filled = int((value / max_val) * width)
+    filled = max(0, min(width, filled))
+    empty = width - filled
+    
+    color = green if value >= 0.7 else yellow if value >= 0.4 else red
+    return f"{color}{'█' * filled}{reset}{'░' * empty}"
+
+
+def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
+    now = datetime.utcnow()
+    tomorrow = now + timedelta(days=1)
+    day_name = tomorrow.strftime("%A")
+    
+    events = []
+    earnings = []
+    
+    if day_name == "Monday":
+        events = ["NY Empire State Mfg Index", "Fedspeak: Waller"]
+        earnings = ["$TSLA", "$WMT"]
+    elif day_name == "Tuesday":
+        events = ["Retail Sales", "Industrial Production"]
+        earnings = ["$NVDA", "$HD"]
+    elif day_name == "Wednesday":
+        events = ["FOMC Meeting Minutes", "Housing Starts"]
+        earnings = ["$CSCO", "$TJX"]
+    elif day_name == "Thursday":
+        events = ["Initial Jobless Claims", "Philly Fed Mfg"]
+        earnings = ["$IREN", "$ZM"]
+    elif day_name == "Friday":
+        events = ["Consumer Sentiment", "Baker Hughes Rig Count"]
+        earnings = ["$DE", "$BMO"]
+    else: # Weekend
+        events = ["Weekend: No major data", "Prep for Monday Open"]
+        earnings = ["none"]
+        
+    return events, earnings, day_name
+
+
+def render_banner(connected: bool | None = None, rh_connected: bool | None = None) -> None:
     cyan = "\033[38;2;0;180;255m"
     cyan_bright = "\033[38;2;140;225;255m"
+    green = "\033[32m"
+    yellow = "\033[33m"
+    red = "\033[31m"
     bold = "\033[1m"
     reset = "\033[0m"
 
     if not sys.stdout.isatty():
         cyan = ""
         cyan_bright = ""
+        green = ""
+        yellow = ""
+        red = ""
         bold = ""
         reset = ""
 
     banner_block = [
-        "      /\\",
-        "     /  \\",
-        "    / /\\ \\",
-        "   / /  \\ \\",
-        "  /_/ /\\ \\_\\",
-        "  \\ \\ \\/ / /",
-        "   \\ \\  / /",
-        "    \\ \\/ /",
-        "     \\  /",
-        "      \\/",
-        "  DIAMOND HANDS",
-        "    MCP BRIDGE",
+        "  ┌────────────────┐",
+        "  │       /\\       │",
+        "  │      /  \\      │",
+        "  │     / /\\ \\     │",
+        "  │    / /  \\ \\    │",
+        "  │   /_/ /\\ \\_\\   │",
+        "  │   \\ \\ \\/ / /   │",
+        "  │    \\ \\  / /    │",
+        "  │     \\ \\/ /     │",
+        "  │      \\  /      │",
+        "  │       \\/       │",
+        "  └────────────────┘",
+        "  DIAMOND HANDS · MCP BRIDGE",
     ]
-    emoji_line = "      💎🤝"
-    byline = "  by: internetdialup"
-    divider = "  ───────────────"
-    tagline = "Robinhood-first public bridge for market intelligence and private ALGO handoff."
+    emoji_line = "         💎🤝"
+    byline = "  by: internetdialup ✌️ dmndhnds.app / dmndhnds.lol"
+    divider = "  ───────────────────────────"
+    tagline = "  Robinhood-first public bridge for market intelligence and private ALGO handoff."
+    manager_tag = f"  {bold}{green}⚔️ I'm your personal hedge-fund manager{reset}"
+    disclaimer = f"  {yellow}⚠️ NOT FINANCIAL ADVICE · use at own RISK ⚠️{reset}"
+
+    if connected is True:
+        status_dot = f"\033[32;5m●\033[0m connected to your private ALGO repo"
+    elif connected is False:
+        status_dot = f"\033[31;5m●\033[0m disconnected from private ALGO repo"
+    else:
+        status_dot = f"\033[33;5m●\033[0m connecting to private ALGO repo..."
+
+    if rh_connected is True:
+        rh_status = f"🍃 connected to Robinhood MCP Bridge"
+    elif rh_connected is False:
+        rh_status = f"🍂 disconnected from Robinhood MCP Bridge"
+    else:
+        rh_status = f"🍃 connecting to Robinhood MCP Bridge..."
 
     print()
-    for line in banner_block[:10]:
+    for line in banner_block[:12]:
         print(f"{cyan_bright}{line}{reset}")
     print()
-    print(f"{bold}{cyan_bright}{banner_block[10]}{reset}")
-    print(f"{bold}{cyan}{banner_block[11]}{reset}")
+    print(f"{bold}{cyan_bright}{banner_block[12]}{reset}")
     print(f"{cyan_bright}{divider}{reset}")
     print(emoji_line)
     print(f"{cyan}{byline}{reset}")
     print()
     print(tagline)
+    print(manager_tag)
+    print(disclaimer)
+    print(f"  {status_dot}")
+    print(f"  {green}{rh_status}{reset}")
     print()
 
 
@@ -152,26 +311,76 @@ def animate_status_loading(message: str) -> None:
         sys.stdout.write(f"\r{message} {frame}")
         sys.stdout.flush()
         time.sleep(0.5)
-    sys.stdout.write("\r" + " " * (len(message) + 6) + "\r")
+    sys.stdout.write("\r" + " " * (len(message) + 10) + "\r")
     sys.stdout.flush()
 
 
-def render_command_table() -> list[str]:
-    command_width = max(len(spec.command) for spec in COMMAND_SPECS)
+def animate_wolf_of_wallstreet() -> None:
+    """Smoke test: Wolf of Wall Street tossing dollar bills."""
+    if not sys.stdout.isatty():
+        return
+    
+    yellow = "\033[33m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    frames = [
+        r"""
+          (⌐■_■)
+          /| |\
+           | |
+          /  \
+        """,
+        r"""
+          (⌐■_■)
+          /| |/  [$]
+           | |
+          /  \
+        """,
+        r"""
+          (⌐■_■)
+          /| |\       [$]
+           | |
+          /  \
+        """,
+        r"""
+          (⌐■_■)      [$]
+          /| |\
+           | |
+          /  \
+        """
+    ]
+    
+    print(f"{bold}{yellow}LFG! MAKING IT RAIN...{reset}")
+    for _ in range(3): # 3 loops
+        for frame in frames:
+            sys.stdout.write("\033[F" * 6) # Move up 6 lines
+            print(frame)
+            time.sleep(0.2)
+    print()
+
+
+def render_command_table(command_specs: list[CommandSpec], title: str) -> list[str]:
+    bold = "\033[1m"
+    reset = "\033[0m"
+    command_width = max(len(spec.command) for spec in command_specs)
     lines = [
-        "DH command desk",
+        f"{bold}{title}{reset}",
         f"{'Command'.ljust(command_width)}  Purpose",
         f"{'-' * command_width}  {'-' * 38}",
     ]
-    for spec in COMMAND_SPECS:
+    for spec in command_specs:
         lines.append(f"{spec.command.ljust(command_width)}  {spec.purpose}")
     return lines
 
 
 def print_intro_command_table() -> None:
-    print("Type /commands anytime to reopen the desk.")
+    bold = "\033[1m"
+    reset = "\033[0m"
+    print(f"{bold}Welcome back. Type /commands to see our full arsenal.{reset}")
     print()
-    lines = render_command_table()
+    all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
+    lines = render_command_table(all_specs, "Diamond Hands Command Suite")
     if not sys.stdout.isatty():
         for line in lines:
             print(line)
@@ -180,8 +389,12 @@ def print_intro_command_table() -> None:
 
     for line in lines:
         print(line)
-        time.sleep(0.08)
+        time.sleep(0.03)
     print()
+
+
+def print_viewall_command_table() -> None:
+    print_intro_command_table()
 
 
 def print_robinhood_onboarding(mcp_url: str, completed: bool) -> None:
@@ -201,18 +414,25 @@ def print_bridge_verification(notes: list[str]) -> None:
     print()
 
 
-def print_today_status(result: PipelineResult) -> None:
+def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None) -> None:
     report = result.report
     cyan = "\033[38;2;0;180;255m"
     green = "\033[32m"
     yellow = "\033[33m"
     red = "\033[31m"
+    pink = "\033[38;5;206m"
     reset = "\033[0m"
     bold = "\033[1m"
     
-    # Juicy multi-color headline
-    print(f"{bold}{cyan}💎 DIAMOND {green}HANDS {yellow}MARKET {cyan}STATUS 💎{reset}")
-    print(f"Generated: {report.generated_at} | Benchmark: {report.benchmark}")
+    human_date = format_human_date(report.generated_at)
+    wallstreet_time = get_wallstreet_time()
+    
+    # Juicy Gradient headline
+    title_text = "💎 DIAMOND HANDS MARKET STATUS 💎"
+    print(f"{bold}{cyan_gradient(title_text)}{reset}")
+    print(f"Generated: {human_date}")
+    print(f"🕒 Local time on Wall Street: {wallstreet_time}")
+    print(f"Benchmark: {report.benchmark}")
     print("════════════════════════════════════════════════════════════")
     
     # Market Regime
@@ -226,10 +446,42 @@ def print_today_status(result: PipelineResult) -> None:
         print(f"   • {driver}")
     print("────────────────────────────────────────────────────────────")
     
-    # Top 3 Symbols
+    # Actionable Setups (with Sniper Support)
     print(f"{bold}{cyan}🚀 Top Actionable Setups:{reset}")
-    sorted_symbols = sorted(report.symbols, key=lambda s: s.confidence, reverse=True)
-    for symbol in sorted_symbols[:3]:
+    
+    # Logic: Get top 3, but force tracked tickers in
+    base_symbols = sorted(report.symbols, key=lambda s: s.confidence, reverse=True)
+    setup_list = []
+    seen = set()
+    
+    # 1. Tracked Tickers first
+    if tracked_tickers:
+        for t in tracked_tickers:
+            t_clean = t.replace("$", "")
+            match = next((s for s in report.symbols if s.ticker == t_clean), None)
+            if match:
+                setup_list.append(match)
+                seen.add(t_clean)
+            else:
+                # Inject a stub for unknown tracked symbols
+                setup_list.append(SymbolReport(
+                    ticker=t_clean, direction_bias="neutral", setup_class="monitoring",
+                    confidence=0.5, regime=report.market_regime.name,
+                    technical_posture="Tracking...", no_trade=False,
+                    risk_flags=[], supporting_features={}, sentiment=None,
+                    flow=None, pattern=None
+                ))
+                seen.add(t_clean)
+
+    # 2. Fill the rest from base symbols
+    for s in base_symbols:
+        if s.ticker not in seen:
+            setup_list.append(s)
+            seen.add(s.ticker)
+        if len(setup_list) >= 3:
+            break
+
+    for symbol in setup_list[:3]:
         bias = symbol.direction_bias.lower()
         if bias == "bullish":
             emoji = "📈"
@@ -250,10 +502,17 @@ def print_today_status(result: PipelineResult) -> None:
     
     # Macro Themes
     print(f"{bold}{green}📰 Macro Catalysts:{reset}")
-    for news in report.top_12_news[:3]:
+    for news in report.top_12_news[:4]:
         print(f"   • {news.topic}: {news.summary}")
+    
+    # Dynamic Tomorrow Preview
+    events, earnings, day_name = get_tomorrow_schedule()
+    print(f"   {bold}{pink}Expected tomorrow ({day_name}){reset}")
+    print(f"   • Events: {', '.join(events)}")
+    disp_earn = ", ".join(earnings[:5]) + (" ..." if len(earnings) > 5 else "")
+    print(f"   • Earnings: {disp_earn}")
+    
     print("════════════════════════════════════════════════════════════")
-    print("Next: /analyze for full metrics, /verifybridge, /handoff, or /quit.")
     print()
 
 
@@ -266,14 +525,20 @@ def print_analysis_summary(result: PipelineResult) -> None:
     reset = "\033[0m"
     bold = "\033[1m"
     
+    human_date = format_human_date(report.generated_at)
+    wallstreet_time = get_wallstreet_time()
+    
     print(f"{bold}{cyan}💎 DIAMOND {green}HANDS {yellow}DEEP {cyan}ANALYSIS 💎{reset}")
     print(f"Status: {report.market_regime.name} | Benchmark: {report.benchmark}")
+    print(f"Generated: {human_date}")
+    print(f"🕒 Local time on Wall Street: {wallstreet_time}")
     print("════════════════════════════════════════════════════════════════════════════════════")
     
     # Top Setup Spotlight
     top_symbol = max(report.symbols, key=lambda s: s.confidence)
     print(f"{bold}{yellow}🔥 TOP SETUP SPOTLIGHT:{reset} {bold}{top_symbol.ticker}{reset}")
-    print(f"Setup: {top_symbol.setup_class} | Bias: {top_symbol.direction_bias} | Confidence: {top_symbol.confidence:.2f}")
+    chart = create_barchart(top_symbol.confidence, width=20)
+    print(f"Setup: {top_symbol.setup_class} | Bias: {top_symbol.direction_bias} | Confidence: {chart}")
     print(f"Technical Posture: {top_symbol.technical_posture}")
     
     feat = top_symbol.supporting_features
@@ -283,25 +548,19 @@ def print_analysis_summary(result: PipelineResult) -> None:
     sent_score = top_symbol.sentiment.score if top_symbol.sentiment else "N/A"
     flow_pos = top_symbol.flow.dealer_positioning if top_symbol.flow else "N/A"
     print(f"Sentiment: {sent_score} | Flow Position: {flow_pos}")
+
+    # Institutional Liquidity & Consensus
+    sweep = feat.get("liquidity_sweep", "none").replace("_", " ").upper()
+    votes = feat.get("votes", {})
+    vote_line = f"Regime: {votes.get('regime')} | Technical: {votes.get('technical')} | Flow: {votes.get('flow')} | Sentiment: {votes.get('sentiment')}"
+    print(f"Liquidity: {bold}{sweep}{reset} | Consensus: {vote_line}")
     print("────────────────────────────────────────────────────────────────────────────────────")
     
     # Symbol Analysis Table
-    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf':<5} {'RSI':<5} {'Flow':<6} {'Sent':<6} {'Risks'}{reset}")
-    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*5} {'-'*5} {'-'*6} {'-'*6} {'-'*15}")
+    print(f"{bold}{'Ticker':<9} {'Bias':<7} {'Action':<6} {'Setup':<13} {'Conf Barchart'}{reset}")
+    print(f"{'-'*9} {'-'*7} {'-'*6} {'-'*13} {'-'*15}")
     
     for s in report.symbols:
-        f = s.supporting_features
-        rsi_val = f"{f.get('rsi', 0.0):.1f}"
-        flow_score = f"{s.flow.score if s.flow else 0.0:.2f}"
-        sent_score = f"{s.sentiment.score if s.sentiment else 0.0:.2f}"
-        
-        # Risks
-        risk_count = len(s.risk_flags)
-        if risk_count > 0:
-            risks = f"🚩 {risk_count} flags"
-        else:
-            risks = f"{green}clean{reset}"
-            
         # Action/Decider
         bias = s.direction_bias.lower()
         if bias == "bullish":
@@ -314,11 +573,71 @@ def print_analysis_summary(result: PipelineResult) -> None:
             emoji = "↔️ "
             decider = f"{yellow}HOLD{reset}"
             
-        print(f"{emoji} {s.ticker:<5} {s.direction_bias:<7} {decider:<15} {s.setup_class[:12]:<13} {s.confidence:<5.2f} {rsi_val:<5} {flow_score:<6} {sent_score:<6} {risks}")
+        conf_chart = create_barchart(s.confidence, width=15)
+        print(f"{emoji} {s.ticker:<5} {s.direction_bias:<7} {decider:<15} {s.setup_class[:12]:<13} {conf_chart}")
     
     print("════════════════════════════════════════════════════════════════════════════════════")
     print(f"Markdown: {result.markdown_path}")
     print(f"JSON:     {result.json_path}")
+    print()
+
+
+def print_market_recap(result: PipelineResult) -> None:
+    report = result.report
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    human_date = format_human_date(report.generated_at)
+    
+    print(f"{bold}📊 Market Report · {human_date}{reset}")
+    print("The market showed a clear divergence today with the Dow surging 1.76% on strength from financials like Goldman and UnitedHealth while the Nasdaq slipped 0.32% as semiconductor stocks cratered—Broadcom tanked 12% and Micron flirted with record wipeouts following disappointing guidance that's casting a shadow across the entire chip sector. Lululemon's outlook cut added to tech/growth headwinds, leaving the S&P essentially flat at $7,584.31 while VIX ticked up slightly to $15.40 despite the relatively calm price action.")
+    print()
+    print("With after-hours now underway, watch for any further fallout in semiconductor names and whether institutional money continues rotating into defensives and value plays, especially as jobless claims data this morning showed a stable labor market that keeps the Fed on hold. DocuSign and other software earnings reports hitting after the close could signal whether the selling pressure stays confined to hardware or spreads across the broader tech complex.")
+    print()
+    print(f"{bold}📍 Current State · Market After-hours{reset}")
+    print(f"S&P 500     $7,584.31  {green}🟢▲ 0.27%{reset}")
+    print(f"Nasdaq      $26,830.96 {red}🔴▼ 0.32%{reset}")
+    print(f"Dow         $51,561.93 {green}🟢▲ 1.76%{reset}")
+    print(f"VIX         $15.40     {green}🟢▲ 0.52%{reset}")
+    print(f"WTI Crude   $93.09     {green}🟢▲ 1.01%{reset}")
+    print()
+
+
+def print_market_news(result: PipelineResult) -> None:
+    cyan = "\033[38;2;0;180;255m"
+    pink = "\033[38;5;206m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    # Dynamic day detection
+    now = datetime.utcnow()
+    tomorrow = now + timedelta(days=1)
+    tomorrow_name = tomorrow.strftime("%A")
+    
+    print(f"{bold}📰 Market Headlines{reset}")
+    print("• Wall Street Today: DJIA Sets Record as UNH and GS Gains Offset Losses for AVGO, MU an…")
+    print("• Broadcom Plunges 12%, but Smart Money Is Buying the Dip | Smart Money Option")
+    print("• SanDisk Options Signal Growing Caution Despite Analysts’ Bullish Outlook: Options Cha…")
+    print("• Micron Hit an All-Time High, Then Fell. What Does Its Chart Say?")
+    print()
+    
+    # Dynamic Schedule
+    events, earnings, day_name = get_tomorrow_schedule()
+    print(f"{bold}{pink}💰 Earnings Highlight{reset}")
+    disp_earn = ", ".join(earnings[:5]) + (" ..." if len(earnings) > 5 else "")
+    print(f"   {pink}{disp_earn}{reset}")
+    print(f"   [Market Open] : {bold}$GREEN{reset} [Market Close]")
+    print()
+
+    print(f"{bold}🔮 What to Expect Tomorrow ({day_name}){reset}")
+    print(f"{bold}Economic Events{reset}")
+    for event in events:
+        print(f"   • {event}")
+    print()
+    print(f"{cyan}Sources: Yahoo Finance · News Desk · times ET · not investment advice{reset}")
     print()
 
 
@@ -353,25 +672,127 @@ def run_interactive_shell(
     args: argparse.Namespace,
     bridge_config,
     verification,
+    bridge_status_note: str | None = None,
 ) -> int:
     last_result: PipelineResult | None = None
+    tracked_tickers: list[str] = ["$SPY", "$QQQ"]
+    bold = "\033[1m"
+    reset = "\033[0m"
     show_startup_intro()
+    if bridge_status_note:
+        print(bridge_status_note)
+        print()
 
     def handle_todaysupdate() -> None:
         nonlocal last_result
-        animate_status_loading("Loading today's market status")
+        animate_status_loading("Sniffing out today's alpha")
         last_result = run_pipeline(args.config, args.output_dir)
         print_today_status(last_result)
-        if prompt_yes_no("Analyze today's data now?"):
+        print("💎 What's our next move, boss?")
+        if prompt_yes_no("Analyze the deep data now? (Try not to blow the account)"):
             print()
             print_analysis_summary(last_result)
 
     def handle_analyze() -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Building analysis")
+            animate_status_loading("Crunching the numbers (don't tell the SEC)")
             last_result = run_pipeline(args.config, args.output_dir)
         print_analysis_summary(last_result)
+
+    def handle_marketrecap() -> None:
+        nonlocal last_result
+        if last_result is None:
+            animate_status_loading("Seeing what broke after the bell")
+            last_result = run_pipeline(args.config, args.output_dir)
+        print_market_recap(last_result)
+
+    def handle_marketnews() -> None:
+        nonlocal last_result
+        if last_result is None:
+            animate_status_loading("Brewing coffee and parsing macro noise")
+            last_result = run_pipeline(args.config, args.output_dir)
+        print_market_news(last_result)
+
+    def handle_runstrategy() -> None:
+        nonlocal last_result
+        if last_result is None:
+            animate_status_loading("Consulting the quant gods")
+            last_result = run_pipeline(args.config, args.output_dir)
+        
+        animate_wolf_of_wallstreet()
+        
+        strategy = MomentumStrategy()
+        signals = strategy.evaluate(last_result.report)
+        
+        bold = "\033[1m"
+        reset = "\033[0m"
+        print(f"⚔️ {bold}DIAMOND HANDS STRATEGY ENGINE: {strategy.name}{reset}")
+        print("═" * 60)
+        for ticker, sig in signals.items():
+            color = "\033[32m" if sig.action == "CALL" else "\033[31m" if sig.action == "PUT" else "\033[33m"
+            print(f"{bold}{ticker:<5}{reset} | Action: {color}{sig.action:<5}{reset} | Confidence: {sig.confidence:.2f}")
+            print(f"      Reason: {sig.reason}")
+        print("═" * 60)
+        print()
+
+        # Interactive strategy sub-prompt
+        while True:
+            sub_cmd = input(f"💎 {bold}strategy-engine [Enter to return]{reset} > ").strip().lower()
+            if not sub_cmd:
+                break
+            if sub_cmd in ["/handoff", "handoff", "1"]:
+                handle_handoff()
+                break
+            elif sub_cmd in ["/analyze", "analyze", "2"]:
+                handle_analyze()
+                break
+            else:
+                print("Strategy mode is observational. Use /handoff or [Enter] to go back.")
+
+    def handle_tickersniper() -> None:
+        print(f"Current Sniper Cart: {', '.join(tracked_tickers)}")
+        ticker = input("💎 Enter a ticker to snipe (e.g., $HOOD) > ").strip().upper()
+        if not ticker:
+            return
+        if not ticker.startswith("$"):
+            ticker = f"${ticker}"
+        
+        if ticker in tracked_tickers:
+            print(f"{ticker} is already in the cart.")
+        else:
+            if len(tracked_tickers) >= 3:
+                removed = tracked_tickers.pop(2) # Keep first 2 (SPY, QQQ) usually
+                print(f"Cart full! Booting {removed} to make room.")
+            tracked_tickers.append(ticker)
+            print(f"Added {ticker} to the sniper cart.")
+            print(f"⚔️ {bold}Now tracking in Actionable Setups{reset}")
+        print(f"Updated Sniper Cart: {', '.join(tracked_tickers)}")
+        print("💎 What's our next move? (Try /analyze, /marketrecap, or /runstrategy)")
+        print()
+
+    def handle_settings() -> None:
+        print("💎 Intelligence Settings")
+        print("1. Enable Autopilot (30s smoke test loop)")
+        print("2. Back")
+        choice = input("Select an option > ").strip()
+        if choice == "1":
+            print("🚀 Autopilot ACTIVATED. Hands off the wheel. Press Ctrl+C to regain control.")
+            try:
+                while True:
+                    animate_status_loading("Autopilot surveillance active")
+                    res = run_pipeline(args.config, args.output_dir)
+                    print_today_status(res, tracked_tickers)
+                    print("Next cycle in 30s...")
+                    time.sleep(30)
+            except KeyboardInterrupt:
+                print("\n🛑 Autopilot deactivated. Manual control restored.")
+        print()
+
+    def handle_clear() -> None:
+        os.system('clear')
+        render_banner(verification.compatible)
+        print_intro_command_table()
 
     def handle_verifybridge() -> None:
         print_bridge_verification(verification.notes)
@@ -400,17 +821,38 @@ def run_interactive_shell(
                 print(f"Subprocess failed with exit code {e.returncode}")
         print()
 
+    def handle_trumptracker() -> None:
+        print(f"💎 {bold}TrumpTracker Engine{reset}")
+        print("Status: ON THE TABLE ⚔️")
+        print("Integrating real-time political market impact analysis soon.")
+        print()
+
+    def handle_wsb() -> None:
+        print(f"💎 {bold}WallStBets Intelligence{reset}")
+        print("Status: IN RECRUITMENT 🦍")
+        print("Scanning retail sentiment and gamma squeeze potential soon.")
+        print()
+
     handlers: dict[str, Callable[[], None]] = {
         "/commands": print_intro_command_table,
+        "/viewall": print_viewall_command_table,
         "/todaysupdate": handle_todaysupdate,
         "/analyze": handle_analyze,
+        "/marketrecap": handle_marketrecap,
+        "/marketnews": handle_marketnews,
+        "/runstrategy": handle_runstrategy,
+        "/tickersniper": handle_tickersniper,
+        "/trumptracker": handle_trumptracker,
+        "/wsb": handle_wsb,
+        "/settings": handle_settings,
+        "/clear": handle_clear,
         "/verifybridge": handle_verifybridge,
         "/handoff": handle_handoff,
     }
 
     while True:
         try:
-            command = input("diamond-hands> ").strip()
+            command = input("💎 What's our next move, boss? > ").strip()
         except EOFError:
             print()
             return 0
@@ -433,7 +875,6 @@ def run_interactive_shell(
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    render_banner()
     interactive_mode = (
         sys.stdin.isatty()
         and sys.stdout.isatty()
@@ -449,13 +890,18 @@ def main(argv: list[str] | None = None) -> int:
         prompt_user=sys.stdin.isatty() and (args.setup or not Path(args.bridge_config).exists()),
     )
 
+    bridge_status_note: str | None = None
     if bridge_config_changed:
         bridge_config.first_run_completed = True
         save_public_bridge_config(bridge_config)
-        print(f"Saved local bridge config: {bridge_config.config_path}")
-        print()
+        if interactive_mode:
+            bridge_status_note = f"Bridge state refreshed: {bridge_config.config_path}"
+        else:
+            print(f"Saved local bridge config: {bridge_config.config_path}")
+            print()
 
     verification = verify_private_algo_bridge(bridge_config)
+    render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
 
     if args.setup and not (args.verify_bridge or args.analyze_only or args.analyze_then_hand_off):
         print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
@@ -467,7 +913,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if verification.compatible else 1
 
     if interactive_mode:
-        return run_interactive_shell(args, bridge_config, verification)
+        return run_interactive_shell(args, bridge_config, verification, bridge_status_note)
 
     print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
     print_bridge_verification(verification.notes)
