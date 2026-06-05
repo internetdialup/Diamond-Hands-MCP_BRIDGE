@@ -1,6 +1,8 @@
 # Diamond-Hands-MCP_BRIDGE
 
-Public Robinhood-first bridge CLI for market intelligence and private trading handoff. Welcome to the casino! Where everyone wins and loses! The first's one is free, but the house always wins. So, here's an MCP bridge to help you turn those Diamond hands into tangible liquidity. 💎🤝
+Public Robinhood-first bridge CLI for market intelligence and private trading handoff. Welcome to the casino! Where everyone wins and loses! The first one is free, but the house always wins. So, here's an MCP bridge to help you turn those Diamond hands into tangible liquidity. 💎🤝
+
+DMNDHNDS is not Financial Advice. Use at your own Risk. Don't end up being the exit liquidity. Paper trade your algos, back-test, use this to build and strengthen your alpha and MCP connectors.
 
 ## What This Repo does 
 
