@@ -94,13 +94,14 @@ class CommandSpec:
 CORE_COMMAND_SPECS = [
     CommandSpec("/todaysupdate", "Show today's market summary"),
     CommandSpec("/analyze", "Show the full deep-dive analysis report"),
-    CommandSpec("/marketrecap", "Show the market recap view"),
-    CommandSpec("/marketnews", "Show the market news view"),
-    CommandSpec("/verifybridge", "Check your private connector"),
-    CommandSpec("/handoff", "Send the latest report to your private repo"),
+    CommandSpec("/portfolio", "View buying power and current positions"),
+    CommandSpec("/ask", "Ask your manager about specific tickers"),
+    CommandSpec("/more", "Show all advanced modules & settings"),
 ]
 
 PRIVATE_OPERATOR_COMMAND_SPECS = [
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
     CommandSpec("/agents", "Show Codex/Claude private ALGO supervisor status"),
     CommandSpec("/spy0dte", "Generate a private SPY 0DTE paper intent"),
     CommandSpec("/liveboard", "Open the private operator cockpit"),
@@ -116,7 +117,8 @@ EXPERIMENTAL_COMMAND_SPECS = [
     CommandSpec("/commands", "Show the core command list"),
     CommandSpec("/viewall", "Show the full suite"),
     CommandSpec("/setup", "Show the setup and integration guide"),
-    CommandSpec("/autopilot", "Open the private paper-only agent supervisor"),
+    CommandSpec("/marketrecap", "Show the market recap view"),
+    CommandSpec("/marketnews", "Show the market news view"),
     CommandSpec("/tickersniper", "Track up to three symbols locally"),
     CommandSpec("/trumptracker", "Monitor specific political market impacts"),
     CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
@@ -460,17 +462,20 @@ def print_intro_command_table(connected: bool = False) -> None:
         for line in lines:
             print(line)
         print()
-        for line in private_lines:
-            print(line)
-        print()
+        if connected:
+            for line in private_lines:
+                print(line)
+            print()
         return
 
     for line in lines:
         print(line)
     print()
-    for line in private_lines:
-        print(line)
-    print()
+
+    if connected:
+        for line in private_lines:
+            print(line)
+        print()
 
 
 def print_viewall_command_table() -> None:
