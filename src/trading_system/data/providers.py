@@ -154,8 +154,22 @@ from trading_system.features.technical import momentum_score
 
 class YahooFinanceProvider(DataProvider):
     def load_snapshot(self, config: RuntimeConfig) -> MarketSnapshot:
+        # Ticker Mapping: Decouple display labels from actual fetch tickers
+        # Yahoo Finance needs specific tickers (like ^VIX or SPY)
+        TICKER_MAP = {
+            "SPY x SPX": "SPY",
+            "VIX": "^VIX"
+        }
+        
+        def to_yf(t): return TICKER_MAP.get(t, t)
+        
         symbols = list(config.universe.symbols)
-        all_tickers = symbols + [config.universe.benchmark, config.universe.volatility_symbol]
+        # Convert all requested symbols to YF-compatible tickers
+        yf_symbols = [to_yf(s) for s in symbols]
+        yf_benchmark = to_yf(config.universe.benchmark)
+        yf_volatility = to_yf(config.universe.volatility_symbol)
+        
+        all_tickers = yf_symbols + [yf_benchmark, yf_volatility]
         
         # Deduplicate
         all_tickers = list(dict.fromkeys(all_tickers))
@@ -164,11 +178,14 @@ class YahooFinanceProvider(DataProvider):
         data = yf.download(all_tickers, period="60d", interval="1d", group_by='ticker', progress=False)
         
         symbol_snapshots: dict[str, SymbolSnapshot] = {}
-        for symbol in symbols:
-            ticker_data = data[symbol]
+        for i, symbol in enumerate(symbols):
+            yf_ticker = yf_symbols[i]
+            ticker_data = data[yf_ticker]
             bars = []
             for idx, row in ticker_data.iterrows():
-                if hasattr(row, 'Close') and not hasattr(row.Close, '__iter__'): # Handle single vs multi-index
+                # Handle potential missing data for a specific ticker
+                if hasattr(row, 'Close') and not hasattr(row.Close, '__iter__'):
+                    if str(row.Close) == 'nan': continue
                     bars.append(PriceBar(
                         open=float(row.Open),
                         high=float(row.High),
@@ -177,11 +194,12 @@ class YahooFinanceProvider(DataProvider):
                         volume=float(row.Volume)
                     ))
             
+            if not bars:
+                continue
+
             # Accurate Sentiment Correlation: Correlate sentiment with 10-day momentum
             momo = momentum_score(bars, window=10) if len(bars) >= 10 else 0.0
             
-            # Scale momentum (-0.05 to 0.05 typical) to sentiment score (-1 to 1)
-            # 0.02 momo -> 0.6 sentiment
             sent_score = max(-1.0, min(1.0, momo * 20.0))
             mentions_today = int(100 + abs(sent_score) * 400)
             mentions_yesterday = int(mentions_today * (0.8 if sent_score > 0 else 1.2))
@@ -203,19 +221,20 @@ class YahooFinanceProvider(DataProvider):
                     theta=-0.1,
                     charm=0.05,
                     dealer_positioning="long_gamma" if sent_score > 0.3 else "supportive" if sent_score > -0.1 else "fragile"
-                )
+                ),
+                news=yf.Ticker(symbol).news[:5] # Fetch top 5 live headlines
             )
 
-        benchmark_data = data[config.universe.benchmark]
+        benchmark_data = data[yf_benchmark]
         benchmark_bars = [
             PriceBar(open=float(r.Open), high=float(r.High), low=float(r.Low), close=float(r.Close), volume=float(r.Volume))
-            for _, r in benchmark_data.iterrows()
+            for _, r in benchmark_data.iterrows() if str(r.Close) != 'nan'
         ]
 
-        vol_data = data[config.universe.volatility_symbol]
+        vol_data = data[yf_volatility]
         vol_bars = [
             PriceBar(open=float(r.Open), high=float(r.High), low=float(r.Low), close=float(r.Close), volume=float(r.Volume))
-            for _, r in vol_data.iterrows()
+            for _, r in vol_data.iterrows() if str(r.Close) != 'nan'
         ]
 
         return MarketSnapshot(

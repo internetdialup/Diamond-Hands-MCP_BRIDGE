@@ -41,6 +41,7 @@ class SymbolSnapshot:
     pe_ratio: float | None = None
     earnings_within_days: int | None = None
     guidance_signal: float | None = None
+    news: list[dict] = field(default_factory=list)
 
 
 @dataclass

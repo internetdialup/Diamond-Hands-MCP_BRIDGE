@@ -53,7 +53,7 @@ def classify_market_regime(snapshot: MarketSnapshot) -> RegimeFeatures:
     if score >= 0.3:
         name = "Risk On"
         summary = "The market is looking strong. It's a good time to ride the trend."
-    elif score <= -0.2:
+    elif score <= -0.1:
         name = "Risk Off"
         summary = "Things are getting choppy. Time to play defense and protect capital."
     else:

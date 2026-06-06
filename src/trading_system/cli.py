@@ -37,6 +37,12 @@ def build_parser() -> argparse.ArgumentParser:
         description="Diamond Hands public bridge CLI for Robinhood-first market intelligence.",
     )
     parser.add_argument(
+        "mode",
+        nargs="?",
+        choices=["boot"],
+        help="Run the DiamondHands boot sequence: analyze, hand off, ingest memory, and render one private cockpit frame.",
+    )
+    parser.add_argument(
         "--config",
         default="config/markets.example.yaml",
         help="Path to runtime config.",
@@ -88,19 +94,29 @@ class CommandSpec:
 CORE_COMMAND_SPECS = [
     CommandSpec("/todaysupdate", "Show today's market summary"),
     CommandSpec("/analyze", "Show the full deep-dive analysis report"),
-    CommandSpec("/portfolio", "View buying power and current positions"),
-    CommandSpec("/ask", "Ask your manager about specific tickers"),
-    CommandSpec("/more", "Show all advanced modules & settings"),
+    CommandSpec("/marketrecap", "Show the market recap view"),
+    CommandSpec("/marketnews", "Show the market news view"),
+    CommandSpec("/verifybridge", "Check your private connector"),
+    CommandSpec("/handoff", "Send the latest report to your private repo"),
+]
+
+PRIVATE_OPERATOR_COMMAND_SPECS = [
+    CommandSpec("/agents", "Show Codex/Claude private ALGO supervisor status"),
+    CommandSpec("/spy0dte", "Generate a private SPY 0DTE paper intent"),
+    CommandSpec("/liveboard", "Open the private operator cockpit"),
+    CommandSpec("/paper", "Run the private paper-trade simulation"),
+    CommandSpec("/risk", "Show private risk and kill-switch state"),
+    CommandSpec("/stop", "Trigger the private local kill-switch"),
+    CommandSpec("/memory", "Show private memory status"),
+    CommandSpec("/recall", "Recall private memory records"),
+    CommandSpec("/hood", "Check private HOOD MCP health"),
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
     CommandSpec("/commands", "Show the core command list"),
     CommandSpec("/viewall", "Show the full suite"),
     CommandSpec("/setup", "Show the setup and integration guide"),
-    CommandSpec("/verifybridge", "Check your private connector"),
-    CommandSpec("/handoff", "Send the latest report to your private repo"),
-    CommandSpec("/marketrecap", "Show a market recap view"),
-    CommandSpec("/marketnews", "Show the market news view"),
+    CommandSpec("/autopilot", "Open the private paper-only agent supervisor"),
     CommandSpec("/tickersniper", "Track up to three symbols locally"),
     CommandSpec("/trumptracker", "Monitor specific political market impacts"),
     CommandSpec("/wsb", "Scan social sentiment for retail chaos"),
@@ -142,10 +158,37 @@ COMMAND_ALIASES = {
     "/verify-bridge": "/verifybridge",
     "/handoff": "/handoff",
     "/hand-off": "/handoff",
+    "/agents": "/agents",
+    "/autopilot": "/autopilot",
+    "/spy0dte": "/spy0dte",
+    "/liveboard": "/liveboard",
+    "/hood": "/hood",
+    "/paper": "/paper",
+    "/risk": "/risk",
+    "/stop": "/stop",
+    "/memory": "/memory",
+    "/recall": "/recall",
     "/quit": "/quit",
     "quit": "/quit",
     "exit": "/quit",
 }
+
+# ---------------------------------------------------------
+# MANAGER PROMPTS (EDIT THESE TO ADD YOUR OWN FLAVOR!)
+# ---------------------------------------------------------
+MANAGER_PROMPTS = [
+    "💎 What's our next move, boss? > ",
+    "💎 King to f9, check. > ",
+    "💎 What's on the shopping list? > ",
+    "💎 Ready for alpha. Next move? > ",
+    "💎 Standing by, boss. > ",
+    "💎 We're cooking with Crisco. What's next? > ",
+    "💎 Boss, the charts are screaming. What's the play? > ",
+    "💎 Market is a bloodbath, but alpha is out there. Next move? > ",
+    "💎 Scanning for the next 10-bagger. Instructions? > ",
+    "💎 Printing money is a full-time job. What's next? > ",
+    "💎 High conviction or high variance? You call it. > "
+]
 
 
 from datetime import datetime, timedelta
@@ -412,13 +455,20 @@ def print_intro_command_table(connected: bool = False) -> None:
     print(f"{bold}Welcome back. Type /commands to see our core arsenal.{reset}")
     print()
     lines = render_command_table(CORE_COMMAND_SPECS, "Diamond Hands Core Commands")
+    private_lines = render_command_table(PRIVATE_OPERATOR_COMMAND_SPECS, "Private Safe Ops")
     if not sys.stdout.isatty():
         for line in lines:
+            print(line)
+        print()
+        for line in private_lines:
             print(line)
         print()
         return
 
     for line in lines:
+        print(line)
+    print()
+    for line in private_lines:
         print(line)
     print()
 
@@ -429,7 +479,7 @@ def print_viewall_command_table() -> None:
     print("════════════════════════════════════════════════════════════")
     print(f"{bold}Full Diamond Hands Suite{reset}")
     print()
-    all_specs = CORE_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
+    all_specs = CORE_COMMAND_SPECS + PRIVATE_OPERATOR_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS
     lines = render_command_table(all_specs, "Extended Intelligence Commands")
     for line in lines:
         print(line)
@@ -453,6 +503,32 @@ def print_bridge_verification(notes: list[str]) -> None:
     print()
 
 
+def print_premarket_brief(report: DailyReportContract) -> None:
+    green = "\033[32m"
+    yellow = "\033[33m"
+    red = "\033[31m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    spy_report = next((s for s in report.symbols if s.ticker == "SPY"), None)
+    if not spy_report:
+        return
+
+    sent = spy_report.sentiment.score if spy_report.sentiment else 0
+    flow = spy_report.flow.dealer_positioning if spy_report.flow else "neutral"
+    
+    # Pre-Market Alpha Logic
+    if report.market_regime.score <= -0.1 or sent < -0.1:
+        brief = f"{red}Boss, morning is starting off RED. Dealers are {flow} and sentiment is dumping. Watch your stops.{reset}"
+    elif report.market_regime.score >= 0.3 and sent > 0.1:
+        brief = f"{green}Boss, morning looks GREEN. Momentum is strong and dealers are {flow}. Ride the wave.{reset}"
+    else:
+        brief = f"{yellow}Boss, morning is looking MIXED. Market is rangebound. Stay picky.{reset}"
+    
+    print(f"  {bold}{brief}{reset}")
+    print("─" * 60)
+
+
 def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None) -> None:
     report = result.report
     cyan = "\033[38;2;0;180;255m"
@@ -466,6 +542,8 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print("════════════════════════════════════════════════════════════")
     human_date = format_human_date(report.generated_at)
     wallstreet_time = get_wallstreet_time()
+    
+    print_premarket_brief(report)
     
     # Juicy Gradient headline
     title_text = "💎 DIAMOND HANDS MARKET STATUS 💎"
@@ -565,6 +643,8 @@ def print_analysis_summary(result: PipelineResult) -> None:
     human_date = format_human_date(report.generated_at)
     wallstreet_time = get_wallstreet_time()
     
+    print_premarket_brief(report)
+    
     print(f"{bold}{cyan}💎 DIAMOND HANDS DEEP ANALYSIS 💎{reset}")
     print(f"Status: {report.market_regime.name} | Benchmark: {report.benchmark}")
     print(f"Generated: {human_date}")
@@ -575,7 +655,20 @@ def print_analysis_summary(result: PipelineResult) -> None:
     top_symbol = max(report.symbols, key=lambda s: s.confidence)
     print(f"{bold}{yellow}🔥 TOP SETUP SPOTLIGHT:{reset} {bold}{top_symbol.ticker}{reset}")
     chart = create_barchart(top_symbol.confidence, width=20)
-    print(f"Setup: {top_symbol.setup_class} (High probability trend setup) | Bias: {top_symbol.direction_bias}")
+    
+    # Conversational setup labels
+    setup_labels = {
+        "momentum_breakout": "(High probability momentum breakout)",
+        "trend_continuation": "(Trend is strong. Ride the wave)",
+        "trend_breakdown": "(High probability structural breakdown)",
+        "bearish_reversal": "(Bearish rejection detected)",
+        "mean_reversion": "(Oversold. Possible snapback bounce)",
+        "failed_breakout": "(Fakeout detected. Reversal likely)",
+        "neutral": "(Distribution phase. No edge detected)"
+    }
+    setup_label = setup_labels.get(top_symbol.setup_class, "(Monitoring...)")
+    
+    print(f"Setup: {top_symbol.setup_class} {setup_label} | Bias: {top_symbol.direction_bias}")
     print(f"Algorithm Conviction: {chart} ({int(top_symbol.confidence * 100)}%)")
     print(f"Technical Posture: {top_symbol.technical_posture}")
     
@@ -964,6 +1057,21 @@ def run_interactive_shell(
     def handle_stop() -> None:
         handle_private_algo_command("stop", ["session", "stop"])
 
+    def handle_agents() -> None:
+        handle_private_algo_command("agents", ["agents", "status"])
+
+    def handle_autopilot() -> None:
+        handle_private_algo_command("autopilot", ["agents", "supervise"], capture=False)
+
+    def handle_spy0dte() -> None:
+        handle_private_algo_command("spy0dte", ["options", "spy-0dte"])
+
+    def handle_memory() -> None:
+        handle_private_algo_command("memory", ["memory", "status"])
+
+    def handle_recall() -> None:
+        handle_private_algo_command("recall", ["memory", "recall"])
+
     def handle_trumptracker() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"💎 {bold}TrumpTracker Engine{reset}")
@@ -1043,13 +1151,7 @@ def run_interactive_shell(
         print()
 
     def handle_intro_menu() -> None:
-        print("════════════════════════════════════════════════════════════")
-        print(f"{bold}Welcome back. Type /commands to see our core arsenal.{reset}")
-        print()
-        lines = render_command_table(CORE_COMMAND_SPECS, "Diamond Hands Core Commands")
-        for line in lines:
-            print(line)
-        print()
+        print_intro_command_table(verification.compatible)
 
     def handle_viewall() -> None:
         print("════════════════════════════════════════════════════════════")
@@ -1085,11 +1187,16 @@ def run_interactive_shell(
         "/paper": handle_paper,
         "/risk": handle_risk,
         "/stop": handle_stop,
+        "/agents": handle_agents,
+        "/autopilot": handle_autopilot,
+        "/spy0dte": handle_spy0dte,
+        "/memory": handle_memory,
+        "/recall": handle_recall,
     }
 
     while True:
         try:
-            raw_input = input(random.choice(prompts)).strip()
+            raw_input = input(random.choice(MANAGER_PROMPTS)).strip()
         except EOFError:
             print()
             return 0
@@ -1158,6 +1265,42 @@ def main(argv: list[str] | None = None) -> int:
         print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
         print_bridge_verification(verification.notes)
         return 0 if verification.compatible else 1
+
+    if args.mode == "boot":
+        render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
+        print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
+        print_bridge_verification(verification.notes)
+        result = run_pipeline(args.config, args.output_dir)
+        print_analysis_summary(result)
+        if not verification.compatible:
+            print("Private ALGO bridge is not compatible. Boot stopped before private commands.")
+            return 1
+        try:
+            handoff = hand_off_to_private_algo(bridge_config, result.json_path)
+            print("Diamond Hands private handoff completed.")
+            if handoff.stdout.strip():
+                print(handoff.stdout.strip())
+            for command_args in (
+                ["memory", "ingest"],
+                ["memory", "ingest-docs"],
+                ["session", "watch", "--watch-once"],
+            ):
+                private_result = run_private_algo_command(bridge_config, command_args, capture=True)
+                if private_result.stdout and private_result.stdout.strip():
+                    print(private_result.stdout.strip())
+            return 0
+        except subprocess.CalledProcessError as e:
+            print("Diamond Hands boot private command failed.")
+            if e.stderr and e.stderr.strip():
+                print(e.stderr.strip())
+            elif e.stdout and e.stdout.strip():
+                print(e.stdout.strip())
+            else:
+                print(f"Subprocess failed with exit code {e.returncode}")
+            return 1
+        except Exception as e:
+            print(f"Diamond Hands boot failed: {e}")
+            return 1
 
     if interactive_mode:
         return run_interactive_shell(args, bridge_config, verification, bridge_status_note)

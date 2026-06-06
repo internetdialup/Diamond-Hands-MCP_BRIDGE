@@ -8,7 +8,7 @@ def direction_bias_from_pattern(setup_class: str) -> str:
         return "bullish"
     if setup_class == "mean_reversion":
         return "watch_rebound"
-    if setup_class == "failed_breakout":
+    if setup_class in {"failed_breakout", "trend_breakdown", "bearish_reversal"}:
         return "bearish"
     return "neutral"
 
@@ -22,6 +22,8 @@ def technical_posture_from_scores(
         return "Strong Momentum"
     if momentum > 0 and macd_histogram > 0:
         return "Bullish"
+    if momentum < -0.015 and current_rsi <= 45 and macd_histogram < 0:
+        return "Heavy Distribution"
     if momentum < -0.01 and macd_histogram < 0:
         return "Weak"
     return "Mixed"

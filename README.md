@@ -57,18 +57,34 @@ PYTHONPATH=src python3 main.py
 
 When the shell opens, type `/commands` to show the starter command list again.
 
-Core commands:
+Core public commands:
 
 ```text
 /commands      Show the command desk
 /todaysupdate  Show today's market summary
 /analyze       Show the full analysis report
+/marketrecap   Show the market recap view
+/marketnews    Show the market news view
 /verifybridge  Check your private connector
 /handoff       Send the latest artifact to Diamond-Hands-Algo
 /quit          Exit the CLI
 ```
 
-Extended commands stay available behind:
+Curated private operator commands are routed into `trading-algo` when the private repo is connected:
+
+```text
+/agents        Show Codex/Claude and HOOD supervisor status
+/spy0dte       Generate a SPY 0DTE paper intent
+/liveboard     Open the private operator cockpit
+/paper         Run the private paper simulation
+/risk          Show caps, stops, blocked reasons, and kill-switch state
+/stop          Trigger the local private kill-switch
+/memory        Show private memory status
+/recall        Recall private memory records
+/hood          Check HOOD MCP health
+```
+
+Extended non-critical commands stay available behind:
 
 ```text
 /viewall
@@ -95,7 +111,9 @@ exit            -> /quit
 3. Run `/analyze` if you want the full report.
 4. Run `/verifybridge` to check your private connector.
 5. Run `/handoff` to send the latest artifact to your private repo.
-6. Run `/liveboard`, `/memory`, `/risk`, or `/stop` to route into the private `trading-algo` engine when the private repo is connected.
+6. Run `/agents`, `/spy0dte`, `/liveboard`, `/memory`, `/risk`, or `/stop` from the same shell.
+
+Use direct `trading-algo ...` commands only for private engineering/debug workflows. The public `diamondhands` shell intentionally does not expose raw model training, model promotion, or low-level private bridge commands.
 
 Not financial advice.
 

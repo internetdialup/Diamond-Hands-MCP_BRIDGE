@@ -149,22 +149,23 @@ class DailyPipeline:
             )
 
         top_symbol = max(symbol_reports, key=lambda item: item.confidence)
-        # Generate News (Mocking top 12)
+        # Generate News (Mix of Pulse and Live Yahoo Headlines)
         top_12_news = [
             NewsItem(topic='Market Vibe', sentiment_score=regime.score, summary=regime.summary),
-            NewsItem(topic='Global Pulse ❤️', sentiment_score=-0.8, summary='Ceasefire in IRAN bad, or some shit'),
-            NewsItem(topic='US Pulse ❤️', sentiment_score=-0.2, summary='Not sure what Don Cheeto is up to; type /trumptracker'),
-            NewsItem(topic='Money Printer', sentiment_score=0.9, summary='Fed printer go brrrr. Tech stocks soaring.'),
-            NewsItem(topic='Retail Chaos', sentiment_score=0.5, summary='Retail traders piling into options. Gamma squeeze imminent.'),
+            NewsItem(topic='Global Pulse ❤️', sentiment_score=-0.8, summary='Geopolitical tension is spiking 🇮🇷 Oil to the moon or some shit'),
+            NewsItem(topic='US Pulse ❤️', sentiment_score=-0.2, summary='Yield curve is inverted as hell; Recession or fakeout? type /trumptracker'),
         ]
-        for symbol in symbol_reports[:7]:
-            top_12_news.append(
-                NewsItem(
-                    topic=f'Tale of {symbol.ticker}', 
-                    sentiment_score=symbol.sentiment.score if symbol.sentiment else 0.0, 
-                    summary=f'Looking {symbol.direction_bias} with {symbol.technical_posture} energy.'
+        
+        # Inject real headlines from snapshots
+        for s_symbol, s_snap in snapshot.symbols.items():
+            for article in s_snap.news[:2]: # Take up to 2 real articles per symbol
+                title = article.get('title', 'Market Update')
+                # Truncate title if too long
+                if len(title) > 60: title = title[:57] + "..."
+                top_12_news.append(
+                    NewsItem(topic=s_symbol, sentiment_score=0.0, summary=title)
                 )
-            )
+        
         while len(top_12_news) < 12:
             top_12_news.append(NewsItem(topic='Macro Update', sentiment_score=0.0, summary='Steady state macro flow.'))
 

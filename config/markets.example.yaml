@@ -12,7 +12,7 @@ timeframes:
     - 1h
 
 data_source:
-  provider: example_vendor
+  provider: yfinance
   scenario: baseline
   timezone: America/Chicago
   adjusted_prices: true

@@ -105,12 +105,23 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
         self.assertEqual(normalize_command("/liveboard"), "/liveboard")
         self.assertEqual(normalize_command("/hood"), "/hood")
         self.assertEqual(normalize_command("/paper"), "/paper")
-        self.assertEqual(normalize_command("/train"), "/train")
-        self.assertEqual(normalize_command("/rank"), "/rank")
+        self.assertEqual(normalize_command("/agents"), "/agents")
+        self.assertEqual(normalize_command("/spy0dte"), "/spy0dte")
         self.assertEqual(normalize_command("/memory"), "/memory")
         self.assertEqual(normalize_command("/recall"), "/recall")
         self.assertEqual(normalize_command("/risk"), "/risk")
         self.assertEqual(normalize_command("/stop"), "/stop")
+        self.assertIsNone(normalize_command("/train"))
+        self.assertIsNone(normalize_command("/rank"))
+
+    def test_command_menus_are_curated_for_operator_surface(self) -> None:
+        from trading_system.cli import CORE_COMMAND_SPECS, PRIVATE_OPERATOR_COMMAND_SPECS, EXPERIMENTAL_COMMAND_SPECS
+
+        visible = {spec.command for spec in CORE_COMMAND_SPECS + PRIVATE_OPERATOR_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS}
+        for command in {"/agents", "/spy0dte", "/liveboard", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood"}:
+            self.assertIn(command, visible)
+        self.assertNotIn("/train", visible)
+        self.assertNotIn("/rank", visible)
 
     @unittest.mock.patch("trading_system.bridge_runtime.shutil.which", return_value="/usr/local/bin/trading-algo")
     @unittest.mock.patch("trading_system.bridge_runtime.subprocess.run")
@@ -180,6 +191,49 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
         self.assertEqual(
             [call.args[1] for call in mock_private.call_args_list],
             [["memory", "ingest"], ["memory", "ingest-docs"], ["session", "watch", "--watch-once"]],
+        )
+
+    @unittest.mock.patch("trading_system.cli.run_private_algo_command")
+    @unittest.mock.patch("trading_system.cli.verify_private_algo_bridge")
+    def test_curated_private_routes_invoke_expected_trading_algo_args(
+        self,
+        mock_verify: unittest.mock.MagicMock,
+        mock_private: unittest.mock.MagicMock,
+    ) -> None:
+        from trading_system.bridge_runtime import BridgeVerification
+        from trading_system.cli import run_interactive_shell
+        from trading_system.bridge_config import PrivateAlgoConfig, PublicBridgeConfig, RobinhoodConfig
+
+        mock_verify.return_value = BridgeVerification(True, True, True, True, ["Bridge compatibility check passed."])
+        mock_private.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="private ok", stderr="")
+        bridge_config = PublicBridgeConfig(
+            version="diamond-hands-bridge/v1",
+            first_run_completed=True,
+            private_algo=PrivateAlgoConfig(PRIVATE_ALGO, Path("config/bridge.example.yaml"), Path("outputs/bridge/execution_preview.json")),
+            public_artifact_json=Path("outputs/daily/daily_report.json"),
+            robinhood=RobinhoodConfig("https://agent.robinhood.com/mcp/trading", False),
+            config_path=Path("config/diamond-hands.local.yaml"),
+        )
+        args = unittest.mock.Mock(config="config/markets.example.yaml", output_dir=None)
+
+        commands = iter(["/agents", "/spy0dte", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood", "/quit"])
+        with unittest.mock.patch("builtins.input", side_effect=lambda *_: next(commands)):
+            with unittest.mock.patch("sys.stdout", new_callable=io.StringIO):
+                code = run_interactive_shell(args, bridge_config, mock_verify.return_value)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(
+            [call.args[1] for call in mock_private.call_args_list],
+            [
+                ["agents", "status"],
+                ["options", "spy-0dte"],
+                ["session", "paper-trade"],
+                ["session", "risk"],
+                ["session", "stop"],
+                ["memory", "status"],
+                ["memory", "recall"],
+                ["hood", "check"],
+            ],
         )
 
 
