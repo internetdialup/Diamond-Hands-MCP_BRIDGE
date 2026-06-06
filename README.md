@@ -82,6 +82,9 @@ Curated private operator commands are routed into `trading-algo` when the privat
 /memory        Show private memory status
 /recall        Recall private memory records
 /hood          Check HOOD MCP health
+/daemon        Show private 24/7 paper monitor status
+/botstatus     Show bot heartbeat and latest daemon cycle
+/startbot      Show safe paper monitor startup commands
 ```
 
 Extended non-critical commands stay available behind:
@@ -111,7 +114,9 @@ exit            -> /quit
 3. Run `/analyze` if you want the full report.
 4. Run `/verifybridge` to check your private connector.
 5. Run `/handoff` to send the latest artifact to your private repo.
-6. Run `/agents`, `/spy0dte`, `/liveboard`, `/memory`, `/risk`, or `/stop` from the same shell.
+6. Run `/agents`, `/spy0dte`, `/botstatus`, `/liveboard`, `/memory`, `/risk`, or `/stop` from the same shell.
+
+To keep the private bot visibly alive outside the interactive prompt, run `/startbot` for the safe foreground and macOS LaunchAgent commands. This starts only the private paper monitor; it does not place live orders.
 
 Use direct `trading-algo ...` commands only for private engineering/debug workflows. The public `diamondhands` shell intentionally does not expose raw model training, model promotion, or low-level private bridge commands.
 

@@ -111,6 +111,9 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
         self.assertEqual(normalize_command("/recall"), "/recall")
         self.assertEqual(normalize_command("/risk"), "/risk")
         self.assertEqual(normalize_command("/stop"), "/stop")
+        self.assertEqual(normalize_command("/daemon"), "/daemon")
+        self.assertEqual(normalize_command("/botstatus"), "/botstatus")
+        self.assertEqual(normalize_command("/startbot"), "/startbot")
         self.assertIsNone(normalize_command("/train"))
         self.assertIsNone(normalize_command("/rank"))
 
@@ -118,7 +121,7 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
         from trading_system.cli import CORE_COMMAND_SPECS, PRIVATE_OPERATOR_COMMAND_SPECS, EXPERIMENTAL_COMMAND_SPECS
 
         visible = {spec.command for spec in CORE_COMMAND_SPECS + PRIVATE_OPERATOR_COMMAND_SPECS + EXPERIMENTAL_COMMAND_SPECS}
-        for command in {"/agents", "/spy0dte", "/liveboard", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood"}:
+        for command in {"/agents", "/spy0dte", "/liveboard", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood", "/daemon", "/botstatus", "/startbot"}:
             self.assertIn(command, visible)
         self.assertNotIn("/train", visible)
         self.assertNotIn("/rank", visible)
@@ -216,7 +219,7 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
         )
         args = unittest.mock.Mock(config="config/markets.example.yaml", output_dir=None)
 
-        commands = iter(["/agents", "/spy0dte", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood", "/quit"])
+        commands = iter(["/agents", "/spy0dte", "/paper", "/risk", "/stop", "/memory", "/recall", "/hood", "/daemon", "/botstatus", "/quit"])
         with unittest.mock.patch("builtins.input", side_effect=lambda *_: next(commands)):
             with unittest.mock.patch("sys.stdout", new_callable=io.StringIO):
                 code = run_interactive_shell(args, bridge_config, mock_verify.return_value)
@@ -233,8 +236,37 @@ class DiamondHandsBridgeCliTests(unittest.TestCase):
                 ["memory", "status"],
                 ["memory", "recall"],
                 ["hood", "check"],
+                ["daemon", "status"],
+                ["daemon", "status"],
             ],
         )
+
+    def test_startbot_prints_safe_daemon_guidance(self) -> None:
+        from trading_system.bridge_config import PrivateAlgoConfig, PublicBridgeConfig, RobinhoodConfig
+        from trading_system.bridge_runtime import BridgeVerification
+        from trading_system.cli import run_interactive_shell
+
+        bridge_config = PublicBridgeConfig(
+            version="diamond-hands-bridge/v1",
+            first_run_completed=True,
+            private_algo=PrivateAlgoConfig(PRIVATE_ALGO, Path("config/bridge.example.yaml"), Path("outputs/bridge/execution_preview.json")),
+            public_artifact_json=Path("outputs/daily/daily_report.json"),
+            robinhood=RobinhoodConfig("https://agent.robinhood.com/mcp/trading", False),
+            config_path=Path("config/diamond-hands.local.yaml"),
+        )
+        args = unittest.mock.Mock(config="config/markets.example.yaml", output_dir=None)
+        verification = BridgeVerification(True, True, True, True, ["Bridge compatibility check passed."])
+
+        commands = iter(["/startbot", "/quit"])
+        with unittest.mock.patch("builtins.input", side_effect=lambda *_: next(commands)):
+            with unittest.mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                code = run_interactive_shell(args, bridge_config, verification)
+
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertIn("trading-algo daemon run", output)
+        self.assertIn("make daemon-start", output)
+        self.assertIn("paper-intent/dry-run only", output)
 
 
 if __name__ == "__main__":

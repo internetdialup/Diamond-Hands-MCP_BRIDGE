@@ -111,6 +111,9 @@ PRIVATE_OPERATOR_COMMAND_SPECS = [
     CommandSpec("/memory", "Show private memory status"),
     CommandSpec("/recall", "Recall private memory records"),
     CommandSpec("/hood", "Check private HOOD MCP health"),
+    CommandSpec("/daemon", "Show private 24/7 paper monitor status"),
+    CommandSpec("/botstatus", "Show bot heartbeat and latest daemon cycle"),
+    CommandSpec("/startbot", "Show safe paper monitor startup commands"),
 ]
 
 EXPERIMENTAL_COMMAND_SPECS = [
@@ -170,6 +173,9 @@ COMMAND_ALIASES = {
     "/stop": "/stop",
     "/memory": "/memory",
     "/recall": "/recall",
+    "/daemon": "/daemon",
+    "/botstatus": "/botstatus",
+    "/startbot": "/startbot",
     "/quit": "/quit",
     "quit": "/quit",
     "exit": "/quit",
@@ -979,7 +985,10 @@ def run_interactive_shell(
             print("🚀 Autopilot ACTIVATED. Redrawing live dashboard. Press Ctrl+C to stop.")
             try:
                 while True:
-                    os.system('clear')
+                    # Efficient in-place redraw
+                    sys.stdout.write('\033[H\033[J')
+                    sys.stdout.flush()
+                    
                     render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
                     print(f"\033[1;32m🚀 LIVE AUTOPILOT ACTIVE (Refreshing every 30s)\033[0m")
                     res = run_pipeline(args.config, args.output_dir)
@@ -993,7 +1002,8 @@ def run_interactive_shell(
         print()
 
     def handle_clear() -> None:
-        os.system('clear')
+        sys.stdout.write('\033[H\033[J')
+        sys.stdout.flush()
         render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
         print_intro_command_table()
 
@@ -1076,6 +1086,38 @@ def run_interactive_shell(
 
     def handle_recall() -> None:
         handle_private_algo_command("recall", ["memory", "recall"])
+
+    def handle_daemon() -> None:
+        handle_private_algo_command("daemon", ["daemon", "status"])
+
+    def handle_botstatus() -> None:
+        handle_private_algo_command("botstatus", ["daemon", "status"])
+
+    def handle_startbot() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"🤖 {bold}DiamondHands Paper Monitor Startup{reset}")
+        print("Safety: paper-intent/dry-run only. No live broker order path is exposed here.")
+        print()
+        print("Foreground debug:")
+        print("  cd ../Trading-MCP-Algo")
+        print("  trading-algo daemon run --config config/bridge.example.yaml --foreground")
+        print()
+        print("One-shot proof:")
+        print("  cd ../Trading-MCP-Algo")
+        print("  trading-algo daemon once --config config/bridge.example.yaml")
+        print()
+        print("macOS launchd persistence:")
+        print("  cd ../Trading-MCP-Algo")
+        print("  make daemon-install")
+        print("  make daemon-start")
+        print("  make daemon-status")
+        print("  make daemon-logs")
+        print()
+        print("Operator view:")
+        print("  /botstatus")
+        print("  /liveboard")
+        print("  /stop")
+        print()
 
     def handle_trumptracker() -> None:
         print("════════════════════════════════════════════════════════════")
@@ -1197,6 +1239,9 @@ def run_interactive_shell(
         "/spy0dte": handle_spy0dte,
         "/memory": handle_memory,
         "/recall": handle_recall,
+        "/daemon": handle_daemon,
+        "/botstatus": handle_botstatus,
+        "/startbot": handle_startbot,
     }
 
     while True:
