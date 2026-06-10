@@ -163,17 +163,18 @@ Users are expected to:
 3. connect their agent to Robinhood Agentic Trading
 4. use the public bridge output as the input to their private execution stack
 
-## ELI5
+## ELI5: The Oven vs. The Food
 
-Imagine you have two robots working together to bake cookies:
+Imagine you are building a professional bakery:
 
-1.  **The Recipe Robot (This Project):** This robot's only job is to look at the ingredients in the pantry (market data), read the cookbook (technical indicators), and figure out the perfect recipe for today. It writes the recipe down on a card and hands it off. It *never* touches the oven.
-2.  **The Chef Robot (Your Private Repo):** This robot takes that recipe card, checks if it's safe (risk rules), and then actually puts the cookies in the oven (makes the trades on Robinhood).
+1.  **The Strategy Oven (This Repo):** This is the high-fidelity visualization and execution surface. It's built to institutional standards with low-latency dashboards and a "Mini Bloomberg" terminal. It knows *how to render* the data, but it doesn't have its own proprietary recipes.
+2.  **The Secret Sauce (Your Private Repo):** This is where you keep your "Food"—your proprietary math, model weights, and risk rules. 
 
-By keeping the **Recipe Robot** public, you can share the analysis layer without exposing secrets or private execution rules.
+By keeping the **Oven** public, we provide a professional-grade execution layer that anyone can use by plugging in their own private **"Lego Piece"** math components. This ensures your edge stays private while the infrastructure stays world-class.
 
 ## Key Docs
 
+- `BRIDGE_PROTOCOL.md` for the standardized JSON interface and building your own math components.
 - `Documentation.md` for the bridge contract and product boundary
 - `docs/robinhood-agentic-trading.md` for Robinhood MCP onboarding
 - `docs/private-algo-bridge.md` for attaching the user’s private ALGO repo

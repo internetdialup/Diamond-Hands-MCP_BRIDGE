@@ -509,12 +509,10 @@ class PersonaManager:
             "alpha": "dh_todaysupdate_payload",
             "social": "dh_analyze_social",
             "political": "dh_analyze_political",
-            "tanner": "dh_tanner_brief",
-            "narrative": "dh_tanner_brief", # Generic key
+            "narrative": "dh_tanner_brief", # Protocol key
             "forecast": "dh_forecast_brief",
-            "goodnight": "dh_goodnight_brief",
-            "majesty": "dh_majesty_brief",
-            "ensemble": "dh_majesty_brief", # Generic key
+            "verifier": "dh_goodnight_brief",
+            "ensemble": "dh_majesty_brief", # Protocol key
             "jensen": "dh_analyze_jensen",
             "ai": "dh_analyze_ai_narrative",
             "mag7": "dh_analyze_mag7",

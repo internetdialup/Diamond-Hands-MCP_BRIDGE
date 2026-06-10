@@ -2,14 +2,19 @@
 
 The running per-Knob log for this repository. Each Bump should add a short, concrete entry with date, timestamp, and what changed in the analysis stack, data model, or research posture. Keep newest entries at the top.
 
-This repository is the research and evaluation side of the trading system. It should stay focused on ingesting data, exploring indicators, validating hypotheses, scoring strategy ideas, and documenting findings before anything moves into execution code.
+---
 
-Use this file to track:
+## Knob: Public Clean Room Finalization (v0.1.6) — Tuesday, June 9, 2026, 01:25 PM CDT
 
-- changes to market data sources, schemas, and collection jobs
-- new indicators, feature engineering, and evaluation methods
-- research conclusions that affect whether a strategy graduates to the algo repo
-- revisions to risk assumptions, labeling rules, or backtest interpretation
+Finalized the repository as a pure **Thin-Client Protocol Renderer**. This commit marks the formal separation between the "Oven" (this public repo) and the "Food" (the private implementation). 
+
+Implemented the following for public relaunch:
+- **Scrubbed Secret Sauce**: All hardcoded proprietary agent names and math references have been removed.
+- **Protocol Standardization**: Established `BRIDGE_PROTOCOL.md` as the canonical JSON contract for the Diamond Hands ecosystem.
+- **Purged Handoff History**: Deleted the `handoff.md` file to remove conversational traces and focus on a spec-driven developer experience.
+- **Metaphor Alignment**: Updated `README.md` to reflect the "Oven vs. Food" architectural paradigm.
+
+This repo is now a generic, high-performance execution surface ready for OSS distribution.
 
 ---
 
