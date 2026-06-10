@@ -42,10 +42,10 @@ def cyan_gradient(text: str) -> str:
     out = ""
     steps = max(1, len(text) - 1)
     for i, char in enumerate(text):
-        r = 0
+        # Nightshade Spec: Green 180->255, Blue 255->180
         g = min(255, int(180 + (75 * (i / steps))))
         b = max(180, int(255 - (75 * (i / steps))))
-        out += f"\033[38;2;{r};{g};{b}m{char}"
+        out += f"\033[38;2;0;{g};{b}m{char}"
     return out + "\033[0m"
 
 def create_barchart(value: float, max_val: float = 1.0, width: int = 10) -> str:
@@ -131,7 +131,17 @@ def render_banner(connected: bool | None = None, rh_connected: bool | None = Non
     if persona and persona.banner_renderer:
         try: persona.banner_renderer(); return
         except Exception: pass
-    bold, cyan_bright, cyan, green, red, yellow, reset = "\033[1m", "\033[96m", "\033[36m", "\033[32m", "\033[31m", "\033[33m", "\033[0m"
+    
+    # Nightshade Visual Spec (v0.20.4)
+    bold = "\033[1m"
+    reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
     
     banner_block = MOTD.BANNER_BLOCK
     subtitle = MOTD.SUBTITLE
@@ -194,7 +204,17 @@ def print_bridge_verification(notes: list[str]) -> None:
     print()
 
 def print_premarket_brief(report: DailyReportContract) -> None:
-    green, yellow, red, grey, reset, bold = "\033[32m", "\033[33m", "\033[31m", "\033[90m", "\033[0m", "\033[1m"
+    # Nightshade Visual Spec (v0.20.4)
+    bold = "\033[1m"
+    reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
+    
     spy_report = next((s for s in report.symbols if s.ticker == "SPY"), None)
     if not spy_report: return
     sent = spy_report.sentiment.score if spy_report.sentiment else 0
@@ -233,7 +253,17 @@ def print_premarket_brief(report: DailyReportContract) -> None:
 
 def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None, persona: PersonaManager | None = None) -> None:
     report = result.report
-    cyan, green, yellow, red, pink, grey, reset, bold = "\033[38;2;0;180;255m", "\033[32m", "\033[33m", "\033[31m", "\033[38;5;206m", "\033[90m", "\033[0m", "\033[1m"
+    # Nightshade Visual Spec
+    bold = "\033[1m"
+    reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
+    
     wallstreet_time = get_wallstreet_time()
     f_color = red if report.market_regime.score < 0 else green
     v_color = green if report.market_regime.score < 0 else red
@@ -356,7 +386,17 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
 
 def print_analysis_summary(result: PipelineResult, target_symbol: str | None = None, persona: PersonaManager | None = None) -> None:
     report = result.report
-    green, yellow, red, reset, bold, cyan, grey = "\033[32m", "\033[33m", "\033[31m", "\033[0m", "\033[1m", "\033[36m", "\033[90m"
+    # Nightshade Visual Spec
+    bold = "\033[1m"
+    reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
+    
     top_symbol = next((s for s in report.symbols if s.ticker == target_symbol.replace("$","").upper()), None) if target_symbol else sorted(report.symbols, key=lambda s: s.confidence, reverse=True)[0]
     if not top_symbol: top_symbol = sorted(report.symbols, key=lambda s: s.confidence, reverse=True)[0]
     print(f"════════════════════════════════════════════════════════════════════════════════════\n  {bold}{cyan_gradient(f'💎 DEEP ANALYSIS: {top_symbol.ticker}')}{reset}\n  Regime: {report.market_regime.name:<15} │ Confidence: {int(top_symbol.confidence*100)}%\n  Setup : {top_symbol.setup_class:<15} │ Posture   : {top_symbol.technical_posture}\n  ──────────────────────────────────────────────────────────────────────────────────")
@@ -412,8 +452,19 @@ def print_analysis_summary(result: PipelineResult, target_symbol: str | None = N
 
 def print_market_recap(result: PipelineResult, persona: PersonaManager | None = None) -> None:
     report = result.report
-    green, yellow, red, grey, reset, bold = "\033[32m", "\033[33m", "\033[31m", "\033[90m", "\033[0m", "\033[1m"
-    print(f"════════════════════════════════════════════════════════════\n🌆 {bold}Market Post-Mortem: {report.generated_at}{reset}\n{'═' * 60}")
+    # Nightshade Visual Spec (v0.20.4)
+    bold = "\033[1m"
+    reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
+    green = "\033[32m"
+    red = "\033[31m"
+    yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
+
+    print(f"════════════════════════════════════════════════════════════════════════════════════\n🌆 {bold}Market Post-Mortem: {report.generated_at}{reset}\n{'═' * 80}")
+
     for s in report.symbols[:5]:
         bias = s.direction_bias.lower()
         print(f" • {bold}{s.ticker:<5}{reset} │ {green if bias == 'bullish' else red if bias == 'bearish' else yellow}{bias.upper():<10}{reset} │ Confidence: {int(s.confidence*100)}%")

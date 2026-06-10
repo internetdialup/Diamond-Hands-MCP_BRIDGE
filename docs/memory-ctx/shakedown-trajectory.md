@@ -26,6 +26,7 @@ The following protocols are now part of the permanent Diamond Hands DNA:
 - **40/40/20 Protocol**: Strict reporting discipline (40% Data, 40% Reasoning, 20% Formatting).
 - **Vigilant Handshake**: Mandatory cross-repo status audit on boot.
 - **KB-Speed Audit**: Optimization for zero-latency TUI painting and artifact pruning.
+- **Visual Synchronization (v0.2.4)**: Achieved 1:1 parity with the private Algo repo's "Nightshade" spec, including high-fidelity truecolor gradients and pixel-perfect ASCII width alignment for the "wide-S" symmetrical logo.
 
 ---
-*Created by Ironhide 🏎️ — v0.2.3 (Trajectory Map Anchored)*
+*Created by Ironhide 🏎️ — v0.2.4 (Visual Sync Anchored)*

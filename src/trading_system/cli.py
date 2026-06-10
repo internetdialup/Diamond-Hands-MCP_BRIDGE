@@ -663,11 +663,16 @@ def run_interactive_shell(
     last_result: PipelineResult | None = None
     tracked_tickers: list[str] = ["$SPY", "$QQQ"]
     voice_enabled: bool = False # Default OFF
+    # Nightshade Visual Spec (v0.20.4)
     bold = "\033[1m"
     reset = "\033[0m"
+    cyan_bright = "\033[38;2;140;225;255m"
+    cyan = "\033[38;2;0;180;255m"
     green = "\033[32m"
     red = "\033[31m"
     yellow = "\033[33m"
+    grey = "\033[90m"
+    pink = "\033[38;5;206m"
 
     # Restored terminal typing animation for cinematic feel
     show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed, persona=persona, animate=True)
