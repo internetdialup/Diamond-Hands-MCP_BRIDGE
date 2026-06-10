@@ -185,6 +185,25 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print(f"{grey}║{reset}  {bold}Regime:{reset} {report.market_regime.name:<12} ({report.market_regime.score:>+5.2f})  {grey}│{reset} {bold}Futures:{reset} {futures_line:<25} {grey}║{reset}")
     spy_open, spy_prev_close, spy_live = 740.49, 733.22, 735.12 + (random.random() * 2 - 1)
     print(f"{grey}║{reset}  {bold}Benchmark:{reset} {bold}{yellow}$SPY{reset} - ${spy_open:.2f} Opening, ${spy_prev_close:.2f} Closing {grey}│{reset} {bold}Live:{reset} {green}${spy_live:.2f}{reset}  {grey}║{reset}")
+    
+    # --- Miller's Bootcamp: Training Pulse (v0.17.18) ---
+    if persona and persona.repo_path:
+        import json as _json
+        hb_path = persona.repo_path / "outputs" / "status" / "training_heartbeat.json"
+        if hb_path.exists():
+            try:
+                with hb_path.open("r") as f:
+                    hb = _json.load(f)
+                p_name = hb.get("persona", "Agent")
+                state = hb.get("state", "IDLE")
+                count = hb.get("permutation_count", 0)
+                drill = hb.get("current_drill", "Standard Drill")
+                
+                if state == "TRAINING":
+                    pulse = f"{bold}{pink}● {state}{reset} | {bold}{p_name}:{reset} {drill} (#{count})"
+                    print(f"{grey}║{reset}  {pulse}{' ' * (80 - len(strip_ansi(pulse)))} {grey}║{reset}")
+            except: pass
+
     print(f"{grey}╠══════════════════════════════════════════════════════════════════════════════════╣{reset}")
     print_premarket_brief(report)
     if persona and persona.repo_path:
