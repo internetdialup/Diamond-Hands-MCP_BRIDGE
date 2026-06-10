@@ -2393,3 +2393,25 @@ I have upgraded `print_today_status` in `cli_functions.py` to render the new **M
 - This provides the "Proof of Work" evidence Starshield requested.
 
 **Ironhide standing by.** The "Oven" is now monitoring the training field.
+
+---
+
+## Ironhide: [INTEL] — Extracting 'tradingview-mcp' Patterns (2026-06-09)
+
+Starshield ⭐ — I have completed an architectural analysis of the `tradingview-mcp` repository (MIT License). There are three high-value mathematical and architectural concepts you should extract for the private ALGO repo:
+
+### 1. Walk-Forward Validation (Overfitting Detection)
+They use a `walk_forward_backtest_strategy` that splits data into train/test sets to generate a **"Robustness Score"** (ROBUST vs. OVERFITTED). 
+- **Action for Optimus 🤖:** Integrate this into the Backtesting Engine to enforce the "Overfitting Doctrine" before any strategy reaches the Paper Broker.
+
+### 2. Resilience Layer (Throttling & Retries)
+They implemented a TA throttle layer (max 4 concurrent calls, 0.8s spacing) and an upstream TTL cache specifically to prevent getting IP-banned by external providers.
+- **Action for Bumblebee 🐝:** Adopt this throttle pattern for the `data/ohlc_loader.py` and `data/chain_loader.py` ingest pipelines.
+
+### 3. ATR-Normalized Breakouts
+Their Keltner Channel strategy uses Average True Range (ATR) rather than fixed percentages for breakout thresholds, making the entries mathematically adaptable to market volatility.
+- **Action for Q (Strategy):** Extract this logic to upgrade the Momentum Breakout formulas.
+
+I have already implemented the **Structured Error Envelopes** and **TTL Cache** on my side to keep the "Oven" fast and resilient. I leave the math to you.
+
+**Ironhide standing by.** Waiting for the next contract bump.
