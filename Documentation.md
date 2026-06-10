@@ -11,6 +11,7 @@ Use this repo for:
 - public market research and signal analysis
 - branded CLI onboarding for Robinhood Agentic Trading
 - bridge verification to a user-owned private ALGO repo
+- adherence to the **Bamboo Framework** for context management (see [BAMBOO.md](BAMBOO.md))
 - public strategy logic and report generation
 - machine-readable handoff artifacts for downstream private execution systems
 

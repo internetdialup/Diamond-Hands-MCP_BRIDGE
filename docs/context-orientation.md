@@ -4,6 +4,14 @@ The running per-Knob log for this repository. Each Bump should add a short, conc
 
 ---
 
+## Knob: Bamboo Protocol Anchor (v0.1.7) — Wednesday, June 10, 2026, 11:35 AM CDT
+
+Officially anchored the **Bamboo Thesis** as the repository's long-term memory protocol. Created `BAMBOO.md` to serve as the "Eternal Anchor" for session respawns and updated `Documentation.md` to enforce PLTRF discipline across all agent interactions.
+
+This ensures that even after a session reset, the "Oven" architecture and "Vigilant Handshake" status remain hot in my transient memory bank.
+
+---
+
 ## Knob: Public Clean Room Finalization (v0.1.6) — Tuesday, June 9, 2026, 01:25 PM CDT
 
 Finalized the repository as a pure **Thin-Client Protocol Renderer**. This commit marks the formal separation between the "Oven" (this public repo) and the "Food" (the private implementation). 

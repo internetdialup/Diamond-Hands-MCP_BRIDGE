@@ -15,6 +15,11 @@ if TYPE_CHECKING:
 def strip_ansi(text: str) -> str:
     return re.sub(r'\033\[[0-9;]*m', '', text)
 
+def mask_ticker(ticker: str) -> str:
+    """Masks ticker symbols for public logs (e.g. SPY -> S**)."""
+    if len(ticker) <= 1: return ticker
+    return ticker[0] + "*" * (len(ticker) - 1)
+
 def get_wallstreet_time() -> str:
     utc_now = datetime.utcnow()
     edt_now = utc_now - timedelta(hours=4)
@@ -63,6 +68,29 @@ def play_alert(message: str) -> None:
         try: subprocess.run(["say", "-v", "Samantha", message], check=False)
         except Exception: pass
 
+def animate_status_loading(message: str, duration: float = 1.0, voice: bool = False) -> None:
+    if voice:
+        play_alert(message)
+    if not sys.stdout.isatty():
+        print(f"💎 {message}...")
+        return
+    chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    bold, reset, cyan, green = "\033[1m", "\033[0m", "\033[36m", "\033[32m"
+    end_time = time.time() + duration
+    i = 0
+    while time.time() < end_time:
+        sys.stdout.write(f"\r  {cyan}{chars[i % len(chars)]}{reset} {bold}{message}...{reset}")
+        sys.stdout.flush()
+        time.sleep(0.08)
+        i += 1
+    sys.stdout.write(f"\r  {green}✅{reset} {bold}{message} done.{reset}\n")
+    sys.stdout.flush()
+
+def get_heartbeat_frame() -> str:
+    """Returns a pulsing frame for the CLI heartbeat."""
+    frames = ["❤️ ", "💖", "💗", "💓", "💞"]
+    return frames[int(time.time() * 2) % len(frames)]
+
 def render_error_badge(error: dict) -> str:
     """Renders a beautiful status badge for structured errors (MIT pattern)."""
     red, yellow, reset, bold = "\033[31m", "\033[33m", "\033[0m", "\033[1m"
@@ -97,23 +125,21 @@ def render_confluence_matrix(data: dict) -> None:
         print(row + " │ ".join(scores))
     print()
 
+from trading_system import MOTD
+
 def render_banner(connected: bool | None = None, rh_connected: bool | None = None, animate: bool = True, persona: PersonaManager | None = None) -> None:
     if persona and persona.banner_renderer:
         try: persona.banner_renderer(); return
         except Exception: pass
     bold, cyan_bright, cyan, green, red, yellow, reset = "\033[1m", "\033[96m", "\033[36m", "\033[32m", "\033[31m", "\033[33m", "\033[0m"
-    banner_block = [
-        "   ___  _                                  _   _                     _     ",
-        "  |   \\(_) __ _ _ __  ___  _ __  __| | | | |__ _ _ _  __| |___ ",
-        "  | |) | |/ _` | '  \\/ _ \\| '  \\/ _` | |_| / _` | ' \\/ _` (_-< ",
-        "  |___/|_|\\__,_|_|_|_\\___/|_|_|_\\__,_| \\___/\\__,_|_||_\\__,_/__/ ",
-    ]
-    subtitle = "💎 Diamond Hands - The Retail Alpha Bridge 💎"
-    emoji_line, byline = "         💎🤝", "  by: internetdialup ✌️ 💎🙌 dmndhnds.app / dmndhnds.lol"
-    divider = "  ────────────────────────────────────────────────────────"
-    tagline = "  HFT Mini Bloomberg Terminal for retail-first algorithmic execution."
-    manager_tag = f"  {bold}{green}⚡️ Making decisions faster than humanly possible{reset}"
-    disclaimer = f"  {yellow}⚠️ NOT FINANCIAL ADVICE · use at own RISK ⚠️{reset}"
+    
+    banner_block = MOTD.BANNER_BLOCK
+    subtitle = MOTD.SUBTITLE
+    emoji_line, byline = MOTD.EMOJI_LINE, MOTD.BYLINE
+    divider = MOTD.DIVIDER
+    tagline = MOTD.TAGLINE
+    manager_tag = f"  {bold}{green}{MOTD.MANAGER_TAG_RAW}{reset}"
+    disclaimer = f"  {yellow}{MOTD.DISCLAIMER_RAW}{reset}"
     if connected is True: status_dot = f"\033[32;5m●\033[0m {green}connected to your private ALGO repo{reset}"
     elif connected is False: status_dot = f"\033[31;5m●\033[0m {red}disconnected from private ALGO repo{reset}"
     else: status_dot = f"\033[33;5m●\033[0m connecting to private ALGO repo..."
@@ -129,7 +155,7 @@ def render_banner(connected: bool | None = None, rh_connected: bool | None = Non
             sys.stdout.write("\a"); sys.stdout.flush(); time.sleep(0.06)
     else:
         for line in banner_block: print(cyan_gradient(line))
-    print(f"\n  {bold}{cyan_bright}{subtitle}{reset}\n{cyan_bright}{divider}{reset}\n{emoji_line}\n{cyan}{byline}{reset}\n\n{tagline}\n{manager_tag}\n{disclaimer}\n  {status_dot}\n  {rh_status}\n{ver_status}\n")
+    print(f"\n{bold}{cyan_gradient(subtitle)}{reset}\n{cyan_bright}{divider}{reset}\n{emoji_line}\n{cyan}{byline}{reset}\n\n{tagline}\n{manager_tag}\n{disclaimer}\n  {status_dot}\n  {rh_status}\n{ver_status}\n")
 
 def render_command_table(command_specs: list[CommandSpec], title: str) -> list[str]:
     bold, reset = "\033[1m", "\033[0m"
@@ -216,7 +242,17 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print(f"{grey}╔══════════════════════════════════════════════════════════════════════════════════╗{reset}")
     print(f"{grey}║{reset}  {bold}{cyan_gradient('DIAMOND HANDS COMMAND CENTER')} {reset} {grey}║{reset} {bold}{wallstreet_time}{reset} {grey}║{reset}")
     print(f"{grey}╠══════════════════════════════════════════════════════════════════════════════════╣{reset}")
+    
+    # --- Motive Force & Trend Alignment (v0.17.22) ---
+    motive = report.market_regime.drivers[0] if report.market_regime.drivers else "Neutral"
+    trend_val = report.market_regime.score # Use score as proxy for trend alignment
+    trend_aligned = abs(trend_val) > 0.5
+    trend_color = green if trend_aligned else yellow
+    trend_text = "ALIGNED" if trend_aligned else "CONVERGING"
+    
     print(f"{grey}║{reset}  {bold}Regime:{reset} {report.market_regime.name:<12} ({report.market_regime.score:>+5.2f})  {grey}│{reset} {bold}Futures:{reset} {futures_line:<25} {grey}║{reset}")
+    print(f"{grey}║{reset}  {bold}Force :{reset} {cyan}{motive:<12}{reset}           {grey}│{reset} {bold}Trend  :{reset} {trend_color}{trend_text:<25}{reset} {grey}║{reset}")
+    
     spy_open, spy_prev_close, spy_live = 740.49, 733.22, 735.12 + (random.random() * 2 - 1)
     print(f"{grey}║{reset}  {bold}Benchmark:{reset} {bold}{yellow}$SPY{reset} - ${spy_open:.2f} Opening, ${spy_prev_close:.2f} Closing {grey}│{reset} {bold}Live:{reset} {green}${spy_live:.2f}{reset}  {grey}║{reset}")
     
@@ -262,10 +298,13 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     for s in setup_list:
         bias = s.direction_bias.lower()
         bias_color = green if bias == "bullish" else red if bias == "bearish" else yellow
+        # --- Security Obfuscation (v0.17.19) ---
+        display_ticker = s.ticker if s.ticker in ["SPY", "QQQ", "IWM", "VIX"] else mask_ticker(s.ticker)
+        
         price, chg = ("735.12" if s.ticker == "SPY" else "224.12" if s.ticker == "QQQ" else "124.50"), ("+0.12%" if bias == "bullish" else "-0.45%" if bias == "bearish" else "+0.00%")
         chg_color = green if "+" in chg else red if "-" in chg else yellow
         conf_chart = create_barchart(s.confidence, width=15)
-        row_content = f"{s.ticker:<10} {price:<10} {chg_color}{chg:<10}{reset} {bias_color}{s.direction_bias.upper():<10}{reset} {conf_chart} ({int(s.confidence*100):>2}%) {s.setup_class[:14]:<14}"
+        row_content = f"{display_ticker:<10} {price:<10} {chg_color}{chg:<10}{reset} {bias_color}{s.direction_bias.upper():<10}{reset} {conf_chart} ({int(s.confidence*100):>2}%) {s.setup_class[:14]:<14}"
         print(f"{grey}║{reset}  {row_content}{' ' * (80 - len(strip_ansi(row_content)))} {grey}║{reset}")
     print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{green}📰 MACRO CATALYSTS{reset}{' ':<61} {grey}║{reset}")
@@ -275,9 +314,11 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
         print(f"{grey}║{reset}  {line}{' ' * (80 - len(strip_ansi(line)))} {grey}║{reset}")
     events, earnings, day_name = get_tomorrow_schedule()
     print(f"{grey}║{reset}{' ':<82}{grey}║{reset}\n{grey}║{reset}  {bold}{pink}📅 EXPECTED TOMORROW ({day_name.upper()}){reset}{' ' * (80 - len(strip_ansi(f'📅 EXPECTED TOMORROW ({day_name.upper()})')))} {grey}║{reset}")
-    print(f"{grey}║{reset}  • {bold}ECON{reset}  {', '.join(events)[:68]}{' ' * (80 - len(strip_ansi(f' • ECON  {', '.join(events)[:68]}')))} {grey}║{reset}")
+    econ_line = f" • {bold}ECON{reset}  {', '.join(events)[:68]}"
+    print(f"{grey}║{reset}  {econ_line}{' ' * (80 - len(strip_ansi(econ_line)))} {grey}║{reset}")
     disp_earn = ", ".join(earnings[:5]) + (" …" if len(earnings) > 5 else "")
-    print(f"{grey}║{reset}  • {bold}EARN{reset}  {disp_earn}{' ' * (80 - len(strip_ansi(f' • EARN  {disp_earn}')))} {grey}║{reset}")
+    earn_line = f" • {bold}EARN{reset}  {disp_earn}"
+    print(f"{grey}║{reset}  {earn_line}{' ' * (80 - len(strip_ansi(earn_line)))} {grey}║{reset}")
     print(f"{grey}╚══════════════════════════════════════════════════════════════════════════════════╝{reset}\n")
 
 def print_analysis_summary(result: PipelineResult, target_symbol: str | None = None, persona: PersonaManager | None = None) -> None:
@@ -294,6 +335,23 @@ def print_analysis_summary(result: PipelineResult, target_symbol: str | None = N
         return f"{green if val > 0.2 else red if val < -0.2 else yellow}{'█' * filled}{'░' * (width - filled)}{reset}"
     flow_raw = top_symbol.flow.dealer_positioning if top_symbol.flow else "neutral"
     print(f"  {bold}├────────────────────────────────── GREEK LEVELS ──────────────────────────────────┤{reset}\n  │ {bold}Gamma EX{reset}   │ {greek_bar(gamma)} ({gamma:>+5.2f}) │ {bold}Delta EX{reset}   │ {greek_bar(delta)} ({delta:>+5.2f}) │\n  │ {bold}Vanna EX{reset}   │ {greek_bar(vanna)} ({vanna:>+5.2f}) │ {bold}Dealer Bias{reset}│ {green if flow_raw == 'long_gamma' else red if flow_raw == 'short_gamma' else yellow}{flow_raw.upper():<15}{reset}   │\n  {bold}└──────────────────────────────────────────────────────────────────────────────────┘{reset}")
+    
+    # --- Reasoning Integrity Meter (v0.17.23) ---
+    if persona:
+        debate = persona.get_debate_transcript(top_symbol.ticker)
+        if debate and "monroe_payload" in debate:
+            m = debate["monroe_payload"]
+            sfv = m.get("sfv_score", 0.0)
+            csct = m.get("csct_score", 0.0)
+            cascade = m.get("cascade_prob", 0.0)
+            
+            c_color = red if cascade > 0.55 else green
+            
+            print(f"  {bold}├────────────────────────────── REASONING INTEGRITY ──────────────────────────────┤{reset}")
+            print(f"  │ {bold}Fact Verifier{reset}  │ {create_barchart(sfv)} ({sfv*100:>3.0f}%) │ {bold}Cascade Prob{reset} │ {c_color}{cascade*100:>3.0f}%{reset} {'[HALT]' if cascade > 0.55 else '[SAFE]'}  │")
+            print(f"  │ {bold}Consistency{reset}    │ {create_barchart(csct)} ({csct*100:>3.0f}%) │ {bold}Audit Result{reset} │ {green if sfv > 0.8 else yellow}{'VERIFIED' if sfv > 0.8 else 'SUSPECT':<15}{reset}   │")
+            print(f"  {bold}└──────────────────────────────────────────────────────────────────────────────────┘{reset}")
+
     # 🕵️ DYNAMIC INTELLIGENCE WRAPPERS (v0.15.0 protocol)
     # Allows the private repo to inject any number of agent summaries without hardcoding.
     if persona:
@@ -305,8 +363,13 @@ def print_analysis_summary(result: PipelineResult, target_symbol: str | None = N
                 color = w.get("color", cyan)
                 icon = w.get("icon", "🕵️")
                 
-                print(f"  {bold}{color}{icon} {title.upper()}:{reset}")
-                print(f"  {content}")
+                # --- Motive Force Leader Highlighting (v0.17.23) ---
+                is_leader = "motive leader" in title.lower() or "leader" in content.lower()
+                row_bold = bold if is_leader else ""
+                row_bg = "\033[44m" if is_leader else "" # Blue background for leader
+                
+                print(f"  {row_bold}{color}{icon} {title.upper()}:{reset}")
+                print(f"  {row_bg}{content}{reset}")
                 print(f"{'─' * 84}")
         else:
             print(f"  {grey}Intelligence Team: No specific narrative context for this ticker.{reset}")

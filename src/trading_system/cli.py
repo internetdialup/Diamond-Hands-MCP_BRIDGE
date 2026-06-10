@@ -241,6 +241,15 @@ DEFAULT_PROMPT = "💎 diamond-hands > "
 # Note: Custom personas and manager prompts are now delegated to 
 # the private ALGO bridge (persona.yaml) to maintain secret sauce.
 
+_mcp_proc: "subprocess.Popen[bytes] | None" = None
+_mcp_repo: Path | None = None
+_mcp_next_id = 2
+_mcp_lock = threading.Lock()
+_mcp_token = os.getenv("DH_BRIDGE_TOKEN", "dh-bridge-secret-v1")
+
+_rl_capacity = 10.0
+_rl_tokens = 10.0
+_rl_last_refill = time.time()
 
 from datetime import datetime, timedelta
 
@@ -408,17 +417,47 @@ def call_mcp_tool(repo_path: Path, tool_name: str, arguments: dict | None = None
             else:
                 result = response.get("result")
 
+            # --- Security: Decrypt Secure Payload (v0.1.7) ---
+            if result and isinstance(result, dict) and "secure_payload" in result:
+                obfuscator = Obfuscator()
+                decrypted = obfuscator.decrypt(result["secure_payload"])
+                if "error" not in decrypted:
+                    result = {**result, **decrypted}
+                    del result["secure_payload"]
+
             # Update cache
             if result:
                 with _mcp_cache_lock:
                     _mcp_cache[cache_key] = (time.time(), result)
 
             return result
-            except (KeyboardInterrupt, Exception) as e:
+        except (KeyboardInterrupt, Exception) as e:
             # Server may be in a bad state — force respawn next call.
             _mcp_shutdown()
             return {"error": {"code": "BRIDGE_EXCEPTION", "message": str(e)}}
 import importlib.util
+import base64
+import hashlib
+
+class Obfuscator:
+    """XOR-based obfuscation to protect proprietary 'Food'."""
+    def __init__(self, secret: str = "diamond-hands-v1-key"):
+        self.key = hashlib.sha256(secret.encode()).digest()
+
+    def decrypt(self, encrypted_b64: str) -> dict:
+        try:
+            data = base64.b64decode(encrypted_b64)
+            out = bytearray()
+            for i in range(len(data)):
+                out.append(data[i] ^ self.key[i % len(self.key)])
+            return json.loads(out.decode("utf-8"))
+        except Exception:
+            return {"error": "DECRYPTION_FAILED"}
+
+def coerce(p: Any) -> tuple[str, float]:
+    if isinstance(p, dict):
+        return p.get("text", ""), p.get("weight", 1.0)
+    return str(p), 1.0
 
 class PersonaManager:
     """
@@ -484,6 +523,8 @@ class PersonaManager:
 
     def get_prompt(self) -> str:
         global _UPDATE_AVAILABLE
+        from trading_system.cli_functions import get_heartbeat_frame
+        
         if _UPDATE_AVAILABLE:
             yellow = "\033[33m"
             reset = "\033[0m"
@@ -493,7 +534,10 @@ class PersonaManager:
 
         texts = [p[0] for p in self.prompts]
         weights = [p[1] for p in self.prompts]
-        return random.choices(texts, weights=weights, k=1)[0]
+        base_prompt = random.choices(texts, weights=weights, k=1)[0]
+        
+        # Inject the heartbeat pulse
+        return f"{get_heartbeat_frame()}{base_prompt}"
 
     def get_intel_module(self, module_name: str, **kwargs) -> dict | None:
         """Fetches dynamic intelligence payloads from the private MCP server.
@@ -711,8 +755,9 @@ def run_interactive_shell(
     def handle_analyze(symbol: str | None = None) -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Crunching the numbers (don't tell the SEC)")
+            animate_status_loading("Crunching the numbers", voice=True)
             last_result = run_pipeline(args.config, args.output_dir)
+            play_alert("Deep analysis complete.")
         print_analysis_summary(last_result, target_symbol=symbol, persona=persona)
 
     def handle_marketrecap() -> None:
@@ -840,12 +885,17 @@ def run_interactive_shell(
     def handle_verifybridge() -> None:
         print("════════════════════════════════════════════════════════════")
         print_bridge_verification(verification.notes)
+        if verification.compatible:
+            play_alert("Bridge verified. Private lane is hot.")
+        else:
+            play_alert("Bridge failure. Private lane is offline.")
 
     def handle_handoff() -> None:
         nonlocal last_result
         print("════════════════════════════════════════════════════════════")
         if not verification.compatible:
             print("Private ALGO bridge is not compatible. Handoff blocked.")
+            play_alert("Handoff blocked. Bridge incompatible.")
             print()
             return
         if last_result is None:
@@ -854,16 +904,12 @@ def run_interactive_shell(
         try:
             handoff = hand_off_to_private_algo(bridge_config, last_result.json_path)
             print("Diamond Hands private handoff completed.")
+            play_alert("Intelligence promoted. Starshield has the watch.")
             if handoff.stdout.strip():
                 print(handoff.stdout.strip())
         except subprocess.CalledProcessError as e:
             print("Diamond Hands private handoff failed.")
-            if e.stderr and e.stderr.strip():
-                print(e.stderr.strip())
-            elif e.stdout and e.stdout.strip():
-                print(e.stdout.strip())
-            else:
-                print(f"Subprocess failed with exit code {e.returncode}")
+            play_alert("Handoff failure. Check bridge logs.")
         print()
 
     def handle_private_algo_command(command_name: str, command_args: list[str], capture: bool = True) -> None:
@@ -976,6 +1022,21 @@ def run_interactive_shell(
         print("  /stop")
         print()
 
+    def handle_agents() -> None:
+        handle_private_algo_command("agents", ["agents", "status"])
+
+    def handle_autopilot() -> None:
+        handle_private_algo_command("autopilot", ["agents", "supervise"])
+
+    def handle_memory() -> None:
+        handle_private_algo_command("memory", ["memory", "status"])
+
+    def handle_recall() -> None:
+        handle_private_algo_command("recall", ["memory", "recall"])
+
+    def handle_daemon() -> None:
+        handle_private_algo_command("daemon", ["daemon", "status"])
+
     def handle_trumptracker() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"💎 {bold}TrumpTracker Engine{reset}")
@@ -1020,6 +1081,13 @@ def run_interactive_shell(
         print()
         input("💎 Press [Enter] to return to the desk > ")
         print()
+
+    def handle_intel(module: str | None = None) -> None:
+        print("════════════════════════════════════════════════════════════")
+        module = module or input("💎 Module to query (alpha/social/political/etc) > ").strip().lower()
+        if not module: return
+        
+        animate_status_loading(f"Querying private intelligence node: {module}")
 
         data = persona.get_intel_module(module)
         if not data:
@@ -1738,6 +1806,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # Initialize the Ghost Persona
         persona = PersonaManager(Path(bridge_config.private_algo.repo_path) if verification.compatible else None)
+        play_alert("Diamond Hands system online. Ready to ship.")
 
         if interactive_mode:
             return run_interactive_shell(args, bridge_config, verification, bridge_status_note, persona=persona)
@@ -1776,4 +1845,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except KeyboardInterrupt:
         print("\n👋 Exiting Diamond Hands. See you at the bell.")
+        return 0
+ands. See you at the bell.")
         return 0
