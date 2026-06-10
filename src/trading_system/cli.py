@@ -687,14 +687,19 @@ def run_interactive_shell(
             
             print_today_status(last_result, tracked_tickers, persona=persona)
             
-            # Interactive Next Steps
-            print("💎 Next move?")
-            print(f"  (A) {bold}Analyze{reset} deep data | (S) Check Ticker /{bold}sniper{reset} | (M) View /{bold}more{reset} commands")
-            print(f"  (Enter) Return to desk")
+            # Gemini-style Prompt Table (v0.2.1)
+            print(f"  {bold}───────────────────────────── READY TO SHIP ─────────────────────────────{reset}")
+            print(f"  │ {bold}Action{reset}            │ {bold}Shortcut{reset} │ {bold}Status{reset}                         │")
+            print(f"  ├───────────────────┼──────────┼────────────────────────────────┤")
+            print(f"  │ Deep Analysis     │ A        │ {green}READY{reset}                          │")
+            print(f"  │ Ticker Sniper     │ S        │ {green}ACTIVE{reset}                         │")
+            print(f"  │ Advanced Intel    │ M        │ {yellow}STANDBY{reset}                        │")
+            print(f"  │ Return to Desk    │ Enter    │ {cyan}EXIT{reset}                           │")
+            print(f"  └───────────────────┴──────────┴────────────────────────────────┘")
             print()
             
             # Gemini-style "Thinking" status
-            countdown_msg = f"  {grey}Thinking ... (esc to return, 15s){reset}"
+            countdown_msg = f"  {get_heartbeat_frame()} {grey}Thinking ... (esc to return, 15s){reset}"
             sys.stdout.write(countdown_msg)
             sys.stdout.flush()
             
@@ -1845,6 +1850,4 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except KeyboardInterrupt:
         print("\n👋 Exiting Diamond Hands. See you at the bell.")
-        return 0
-ands. See you at the bell.")
         return 0

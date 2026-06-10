@@ -269,9 +269,12 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
                 count = hb.get("permutation_count", 0)
                 drill = hb.get("current_drill", "Standard Drill")
                 
+                # --- Security: Scrub Private Terms (v0.1.7) ---
+                drill = drill.replace("UMADA", "[REDACTED]")
+                
                 if state == "TRAINING":
                     pulse = f"{bold}{pink}● {state}{reset} | {bold}{p_name}:{reset} {drill} (#{count})"
-                    print(f"{grey}║{reset}  {pulse}{' ' * (80 - len(strip_ansi(pulse)))} {grey}║{reset}")
+                    print(f"{grey}║{reset}  {pulse:<80}{' ' * (80 - len(strip_ansi(pulse)))} {grey}║{reset}")
             except: pass
 
     print(f"{grey}╠══════════════════════════════════════════════════════════════════════════════════╣{reset}")
@@ -279,7 +282,9 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     if persona and persona.repo_path:
         alpha = persona.get_institutional_alpha()
         if alpha:
-            alpha_head = f"{bold}🕵️ Institutional Alpha:{reset} {alpha.get('headline')[:52]}"
+            # --- Security: Scrub Private Terms ---
+            headline = alpha.get('headline', '')[:52].replace("UMADA", "[REDACTED]")
+            alpha_head = f"{bold}🕵️ Institutional Alpha:{reset} {headline}"
             print(f"{grey}║{reset}  {alpha_head}{' ' * (80 - len(strip_ansi(alpha_head)))} {grey}║{reset}")
             print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{cyan}🚀 MARKET SNAPSHOT{reset}{' ':<63} {grey}║{reset}")
@@ -305,20 +310,47 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
         chg_color = green if "+" in chg else red if "-" in chg else yellow
         conf_chart = create_barchart(s.confidence, width=15)
         row_content = f"{display_ticker:<10} {price:<10} {chg_color}{chg:<10}{reset} {bias_color}{s.direction_bias.upper():<10}{reset} {conf_chart} ({int(s.confidence*100):>2}%) {s.setup_class[:14]:<14}"
-        print(f"{grey}║{reset}  {row_content}{' ' * (80 - len(strip_ansi(row_content)))} {grey}║{reset}")
+        # Ensure static length 80
+        padding = 80 - len(strip_ansi(row_content))
+        print(f"{grey}║{reset}  {row_content}{' ' * max(0, padding)} {grey}║{reset}")
     print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{green}📰 MACRO CATALYSTS{reset}{' ':<61} {grey}║{reset}")
-    for news in report.top_12_news[:5]:
+    
+    # --- Deduplicate News Topics ---
+    news_seen = set()
+    news_count = 0
+    for news in report.top_12_news:
+        if news_count >= 5: break
+        if news.topic in news_seen: continue
+        news_seen.add(news.topic)
+        news_count += 1
+        
         topic, summary = news.topic[:8], news.summary[:65] if len(news.summary) <= 65 else news.summary[:62] + "..."
         line = f" • {bold}{topic:<8}{reset} │ {summary}"
-        print(f"{grey}║{reset}  {line}{' ' * (80 - len(strip_ansi(line)))} {grey}║{reset}")
+        padding = 80 - len(strip_ansi(line))
+        print(f"{grey}║{reset}  {line}{' ' * max(0, padding)} {grey}║{reset}")
+        
     events, earnings, day_name = get_tomorrow_schedule()
-    print(f"{grey}║{reset}{' ':<82}{grey}║{reset}\n{grey}║{reset}  {bold}{pink}📅 EXPECTED TOMORROW ({day_name.upper()}){reset}{' ' * (80 - len(strip_ansi(f'📅 EXPECTED TOMORROW ({day_name.upper()})')))} {grey}║{reset}")
-    econ_line = f" • {bold}ECON{reset}  {', '.join(events)[:68]}"
-    print(f"{grey}║{reset}  {econ_line}{' ' * (80 - len(strip_ansi(econ_line)))} {grey}║{reset}")
-    disp_earn = ", ".join(earnings[:5]) + (" …" if len(earnings) > 5 else "")
-    earn_line = f" • {bold}EARN{reset}  {disp_earn}"
-    print(f"{grey}║{reset}  {earn_line}{' ' * (80 - len(strip_ansi(earn_line)))} {grey}║{reset}")
+    print(f"{grey}║{reset}{' ':<82}{grey}║{reset}")
+    print(f"{grey}║{reset}  {bold}{pink}📅 EXPECTED TOMORROW ({day_name.upper()}){reset}{' ' * (80 - len(strip_ansi(f'📅 EXPECTED TOMORROW ({day_name.upper()})')))} {grey}║{reset}")
+    
+    # --- Refine Economy/Earnings Lane ---
+    full_econ = "ECONOMY" if events else "NORMAL"
+    econ_line = f" • {bold}{full_econ:<8}{reset} │ {', '.join(events)[:65]}"
+    padding = 80 - len(strip_ansi(econ_line))
+    print(f"{grey}║{reset}  {econ_line}{' ' * max(0, padding)} {grey}║{reset}")
+    
+    if earnings and earnings[0].lower() != "none":
+        disp_earn = ", ".join(earnings[:5]) + (" …" if len(earnings) > 5 else "")
+        earn_line = f" • {bold}EARN    {reset} │ {disp_earn[:65]}"
+        padding = 80 - len(strip_ansi(earn_line))
+        print(f"{grey}║{reset}  {earn_line}{' ' * max(0, padding)} {grey}║{reset}")
+    else:
+        # Static length row for no earnings
+        none_line = f" • {bold}EARN    {reset} │ none"
+        padding = 80 - len(strip_ansi(none_line))
+        print(f"{grey}║{reset}  {none_line}{' ' * max(0, padding)} {grey}║{reset}")
+        
     print(f"{grey}╚══════════════════════════════════════════════════════════════════════════════════╝{reset}\n")
 
 def print_analysis_summary(result: PipelineResult, target_symbol: str | None = None, persona: PersonaManager | None = None) -> None:
