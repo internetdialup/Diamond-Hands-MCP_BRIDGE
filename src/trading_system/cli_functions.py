@@ -65,8 +65,11 @@ def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
 
 def play_alert(message: str) -> None:
     if sys.platform == "darwin":
-        try: subprocess.run(["say", "-v", "Samantha", message], check=False)
-        except Exception: pass
+        try: 
+            # Non-blocking voice alert
+            subprocess.Popen(["say", "-v", "Samantha", message], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception: 
+            pass
 
 def animate_status_loading(message: str, duration: float = 1.0, voice: bool = False) -> None:
     if voice:
@@ -125,7 +128,7 @@ def render_confluence_matrix(data: dict) -> None:
         print(row + " │ ".join(scores))
     print()
 
-from trading_system import MOTD
+from . import MOTD
 
 def render_banner(connected: bool | None = None, rh_connected: bool | None = None, animate: bool = True, persona: PersonaManager | None = None) -> None:
     if persona and persona.banner_renderer:
@@ -162,7 +165,7 @@ def render_banner(connected: bool | None = None, rh_connected: bool | None = Non
     if animate and sys.stdout.isatty():
         for line in banner_block:
             print(cyan_gradient(line))
-            sys.stdout.write("\a"); sys.stdout.flush(); time.sleep(0.06)
+            sys.stdout.flush(); time.sleep(0.06)
     else:
         for line in banner_block: print(cyan_gradient(line))
     print(f"\n{bold}{cyan_gradient(subtitle)}{reset}\n{cyan_bright}{divider}{reset}\n{emoji_line}\n{cyan}{byline}{reset}\n\n{tagline}\n{manager_tag}\n{disclaimer}\n  {status_dot}\n  {rh_status}\n{ver_status}\n")

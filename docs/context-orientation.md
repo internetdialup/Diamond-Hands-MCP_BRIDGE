@@ -1,4 +1,19 @@
 # Trading-MCP-Analyzer — Context Orientation
+---
+
+## Knob: The Human-Centric Hardening (v0.3.5) — Wednesday, June 10, 2026, 05:55 PM
+
+Completed a massive tactical sprint to transform the "Oven" into a vocal, pulsing co-pilot. Achieved 1:1 visual parity with the private Nightshade truecolor specification.
+
+### 🛡️ Tactical Shipped:
+- **UX Reinforcement**: Live Heartbeat Pulse (Visual) + Samantha Audio Alerts (Auditory) + Micro-Tape Ticker (Kinetic).
+- **TUI Hardening**: Surgically scrubbed private terms ([REDACTED]), fixed static padding for zero-jitter alignment, and implemented the Gemini-style interaction table.
+- **Bamboo Graduation**: Officially anchored v0.4.1 (Anti-Sycophancy & 40/40/20) in the canonical Repository-md.
+- **Protocol Security**: Implemented the XOR Obfuscator for secure payload decoding from Starshield math nodes.
+- **System Stability**: Resolved the "Nightshade Hijack" by re-aligning global entry points and fixed the watchdog initialization UnboundLocalError.
+
+---
+
 
 The running per-Knob log for this repository. Each Bump should add a short, concrete entry with date, timestamp, and what changed in the analysis stack, data model, or research posture. Keep newest entries at the top.
 

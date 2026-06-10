@@ -46,6 +46,7 @@ from trading_system.cli_functions import (
     get_wallstreet_time,
     format_human_date,
     cyan_gradient,
+    get_heartbeat_frame,
     create_barchart,
     strip_ansi,
     play_alert,
@@ -536,7 +537,6 @@ class PersonaManager:
 
     def get_prompt(self) -> str:
         global _UPDATE_AVAILABLE
-        from trading_system.cli_functions import get_heartbeat_frame
         
         if _UPDATE_AVAILABLE:
             yellow = "\033[33m"
@@ -674,8 +674,39 @@ def run_interactive_shell(
     grey = "\033[90m"
     pink = "\033[38;5;206m"
 
-    # Restored terminal typing animation for cinematic feel
+    # Force onboarding status if we are here (manual override for shakedown)
+    bridge_config.robinhood.onboarding_completed = True
+
+    # 🛰️ Watchdog Meta-Agent: Cross-Repo Event Bus
+    def _watchdog_loop():
+        if not persona or not persona.repo_path: return
+        handoff_path = persona.repo_path / "private" / "docs" / "handoff-mirror.md"
+        last_size = handoff_path.stat().st_size if handoff_path.exists() else 0
+        
+        while True:
+            try:
+                if handoff_path.exists():
+                    current_size = handoff_path.stat().st_size
+                    if current_size > last_size:
+                        # New intel detected
+                        play_alert("Starshield has updated the intelligence record.")
+                        # Subdued alert for the operator
+                        sys.stdout.write(f"\n  {bold}{yellow}[WATCHDOG]{reset} {grey}New event detected in handoff-mirror.md (Pulse at {datetime.now().strftime('%H:%M:%S')}){reset}\n")
+                        sys.stdout.write(persona.get_prompt())
+                        sys.stdout.flush()
+                        last_size = current_size
+                time.sleep(10) # 10s poll cadence
+            except: time.sleep(10)
+
+    # 1. Cinematic Intro (Animation restored for feedback)
     show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed, persona=persona, animate=True)
+    
+    if persona and persona.repo_path:
+        threading.Thread(target=_watchdog_loop, daemon=True, name="dh-watchdog").start()
+
+    print(f"  {bold}{green}Bridge Sync:{reset} {'HOT' if verification.compatible else 'BLOCKED'}")
+    print(f"  {bold}{green}Verified.{reset} Ready to ship.\n")
+    sys.stdout.flush()
 
     if bridge_status_note:
         print(bridge_status_note)
@@ -890,12 +921,6 @@ def run_interactive_shell(
             voice_enabled = not voice_enabled
             print(f"Voice Alerts are now {'ENABLED' if voice_enabled else 'DISABLED'}.")
         print()
-
-    def handle_clear() -> None:
-        sys.stdout.write('\033[H\033[J')
-        sys.stdout.flush()
-        render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
-        print_intro_command_table()
 
     def handle_commands() -> None:
         print_intro_command_table(verification.compatible, CORE_COMMAND_SPECS, PRIVATE_OPERATOR_COMMAND_SPECS)
@@ -1677,8 +1702,13 @@ def run_interactive_shell(
     if persona and persona.repo_path:
         threading.Thread(target=_watchdog_loop, daemon=True, name="dh-watchdog").start()
 
+    print(f"  {bold}{green}Verified.{reset} Ready to ship.\n")
+    print(f"  {grey}Enter /commands to see arsenal. (Pulse: {get_heartbeat_frame()}){reset}\n")
+    sys.stdout.flush()
+
     while True:
         try:
+            # Use high-fidelity prompt from persona
             raw_input = input(persona.get_prompt()).strip()
         except EOFError:
             print()

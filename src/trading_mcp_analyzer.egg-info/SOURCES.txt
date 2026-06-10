@@ -5,10 +5,12 @@ src/trading_mcp_analyzer.egg-info/SOURCES.txt
 src/trading_mcp_analyzer.egg-info/dependency_links.txt
 src/trading_mcp_analyzer.egg-info/entry_points.txt
 src/trading_mcp_analyzer.egg-info/top_level.txt
+src/trading_system/MOTD.py
 src/trading_system/__init__.py
 src/trading_system/bridge_config.py
 src/trading_system/bridge_runtime.py
 src/trading_system/cli.py
+src/trading_system/cli_functions.py
 src/trading_system/config.py
 src/trading_system/backtesting/__init__.py
 src/trading_system/backtesting/labels.py
@@ -29,6 +31,8 @@ src/trading_system/models/fusion.py
 src/trading_system/models/pattern.py
 src/trading_system/pipeline/__init__.py
 src/trading_system/pipeline/daily.py
+src/trading_system/strategies/__init__.py
+src/trading_system/strategies/momentum.py
 src/trading_system/utils/__init__.py
 src/trading_system/utils/simple_yaml.py
 tests/test_backtesting.py
