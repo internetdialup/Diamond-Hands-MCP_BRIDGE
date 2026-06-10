@@ -280,11 +280,24 @@ def print_analysis_summary(result: PipelineResult, target_symbol: str | None = N
     
     print(f"{'═' * 84}\n")
 
-def print_market_recap(result: PipelineResult) -> None:
+def print_market_recap(result: PipelineResult, persona: PersonaManager | None = None) -> None:
     report = result.report
-    green, yellow, red, reset, bold = "\033[32m", "\033[33m", "\033[31m", "\033[0m", "\033[1m"
+    green, yellow, red, grey, reset, bold = "\033[32m", "\033[33m", "\033[31m", "\033[90m", "\033[0m", "\033[1m"
     print(f"════════════════════════════════════════════════════════════\n🌆 {bold}Market Post-Mortem: {report.generated_at}{reset}\n{'═' * 60}")
     for s in report.symbols[:5]:
         bias = s.direction_bias.lower()
         print(f" • {bold}{s.ticker:<5}{reset} │ {green if bias == 'bullish' else red if bias == 'bearish' else yellow}{bias.upper():<10}{reset} │ Confidence: {int(s.confidence*100)}%")
-    print(f"{'─' * 60}\nRegime: {report.market_regime.name}\n")
+    print(f"{'─' * 60}\nRegime: {report.market_regime.name}")
+    
+    # --- Verbatim Ledger: Perfect Snipe / Got Smoked (v0.17.18) ---
+    if persona:
+        ledger = persona.get_verbatim_ledger()
+        if ledger:
+            print(f"\n{bold}📜 Verbatim Execution Ledger:{reset}")
+            for entry in ledger[-5:]: # Show last 5
+                time_str = entry[:5]
+                text = entry[6:]
+                color = green if "Perfect Snipe" in text else red if "Smoked" in text else reset
+                print(f"  {grey}{time_str}{reset} {color}{text}{reset}")
+    
+    print()

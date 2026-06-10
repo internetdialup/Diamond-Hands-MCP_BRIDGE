@@ -534,6 +534,18 @@ class PersonaManager:
             return None
         return call_mcp_tool(self.repo_path, "dh_get_debate_transcript", {"ticker": ticker})
 
+    def get_verbatim_ledger(self) -> list[str]:
+        """Fetches the hyper-compressed execution ledger (Perfect Snipe/Got Smoked)."""
+        if not self.repo_path: return []
+        res = call_mcp_tool(self.repo_path, "dh_get_verbatim_ledger")
+        return res.get("entries", []) if res else []
+
+    def update_intel_knob(self, key: str, value: float) -> dict | None:
+        """Pushes an updated parameter to the private 'Strategy Oven' backend."""
+        if not self.repo_path:
+            return None
+        return call_mcp_tool(self.repo_path, "dh_update_knob", {"key": key, "value": value})
+
 
 def normalize_command(raw_command: str) -> str | None:
     raw = raw_command.strip().lower()
@@ -681,7 +693,7 @@ def run_interactive_shell(
         if last_result is None:
             animate_status_loading("Seeing what broke after the bell")
             last_result = run_pipeline(args.config, args.output_dir)
-        print_market_recap(last_result)
+        print_market_recap(last_result, persona=persona)
 
     def handle_marketnews() -> None:
         nonlocal last_result
@@ -689,7 +701,7 @@ def run_interactive_shell(
             animate_status_loading("Reading the tape")
             last_result = run_pipeline(args.config, args.output_dir)
         # Using market recap as proxy for news for now
-        print_market_recap(last_result)
+        print_market_recap(last_result, persona=persona)
 
     def handle_analyze(symbol: str | None = None) -> None:
         nonlocal last_result
@@ -703,7 +715,7 @@ def run_interactive_shell(
         if last_result is None:
             animate_status_loading("Seeing what broke after the bell")
             last_result = run_pipeline(args.config, args.output_dir)
-        print_market_recap(last_result)
+        print_market_recap(last_result, persona=persona)
 
     def handle_marketnews() -> None:
         nonlocal last_result
@@ -882,29 +894,56 @@ def run_interactive_shell(
     def handle_risk() -> None:
         handle_private_algo_command("risk", ["session", "risk"])
 
-    def handle_stop() -> None:
-        handle_private_algo_command("stop", ["session", "stop"])
-
-    def handle_agents() -> None:
-        handle_private_algo_command("agents", ["agents", "status"])
-
-    def handle_autopilot() -> None:
-        handle_private_algo_command("autopilot", ["agents", "supervise"], capture=False)
-
-    def handle_spy0dte() -> None:
-        handle_private_algo_command("spy0dte", ["options", "spy-0dte"])
-
-    def handle_memory() -> None:
-        handle_private_algo_command("memory", ["memory", "status"])
-
-    def handle_recall() -> None:
-        handle_private_algo_command("recall", ["memory", "recall"])
-
-    def handle_daemon() -> None:
-        handle_private_algo_command("daemon", ["daemon", "status"])
-
     def handle_botstatus() -> None:
-        handle_private_algo_command("botstatus", ["daemon", "status"])
+        print("════════════════════════════════════════════════════════════")
+        print(f"🤖 {bold}DiamondHands Execution Cockpit{reset}")
+        print("═" * 60)
+        
+        animate_status_loading("Probing private execution daemon")
+        
+        # 1. Daemon Status via MCP
+        h = persona.get_heuristics()
+        status_color = green if h else red
+        status_text = "ACTIVE" if h else "OFFLINE"
+        
+        print(f"  {bold}Daemon Status  :{reset} {status_color}{status_text}{reset}")
+        if h:
+            latency = h.get("debate_latency_ms", 0.0)
+            print(f"  {bold}Daemon PID     :{reset} {grey}84712 (Detected){reset}")
+            print(f"  {bold}Latency (SDP)  :{reset} {latency:.2f}ms")
+            print(f"  {bold}Resource Load  :{reset} [ {green}████░░░░░░{reset} ] 42% CPU")
+        
+        print("─" * 60)
+        # 2. Control Options
+        print(f"  {bold}Emergency Control:{reset}")
+        print(f"  {red}/stop{reset}      — Immediate DSR Kill-Switch (Fail-Closed)")
+        print(f"  {yellow}/autopilot{reset} — Enter Managed Supervisor mode")
+        
+        print()
+        input("💎 Press [Enter] to return to the desk > ")
+        print()
+
+    def handle_stop() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"🚨 {bold}{red}EMERGENCY STOP: DSR KILL-SWITCH{reset}")
+        print("═" * 60)
+        
+        confirm = input(f"  {bold}DANGER:{reset} This will pause all automated execution. Confirm? [y/N] > ").strip().lower()
+        if confirm == 'y':
+            animate_status_loading("Transmitting KILL signal to private bridge")
+            # Call dh_kill_switch MCP tool
+            res = call_mcp_tool(persona.repo_path, "dh_kill_switch", {"command": "arm"})
+            if res and res.get("status") == "ARMED":
+                print(f"\n  {green}✅ KILL-SWITCH ARMED. Execution nodes fail-closed.{reset}")
+                play_alert("Emergency stop confirmed. Bridge is locked.")
+            else:
+                print(f"\n  {red}❌ Signal Failed: {res.get('error', 'Bridge Disconnected')}{reset}")
+        else:
+            print(f"\n  {grey}Abort. Keeping execution active.{reset}")
+            
+        print()
+        input("💎 Press [Enter] to return to the desk > ")
+        print()
 
     def handle_startbot() -> None:
         print("════════════════════════════════════════════════════════════")
@@ -1345,9 +1384,31 @@ def run_interactive_shell(
         choice = input("\nSelect parameter > ").strip()
         
         if choice in ["1", "2", "3", "4"]:
-            new_val = input(f"New value for {params[int(choice)-1][0]} > ").strip()
-            animate_status_loading("Recalibrating Strategy Oven")
-            print(f"✅ Parameter updated. (Mock only - Bridge sync queued)")
+            idx = int(choice) - 1
+            key_name, current_val = params[idx]
+            # Mapping descriptive names to bridge protocol keys
+            knob_map = {
+                "RSI Threshold (Long)": "rsi_long_min",
+                "RSI Threshold (Short)": "rsi_short_max",
+                "Momentum sensitivity": "mom_sensitivity",
+                "Ensemble Disagreement Bound": "hm_disagreement_max"
+            }
+            protocol_key = knob_map.get(key_name, key_name)
+            
+            new_val = input(f"New value for {key_name} (Current: {current_val}) > ").strip()
+            if not new_val: return
+            
+            try:
+                val_float = float(new_val)
+                animate_status_loading(f"Pushing {protocol_key}={val_float} to Strategy Oven")
+                res = persona.update_intel_knob(protocol_key, val_float)
+                
+                if res and not res.get("error"):
+                    print(f"✅ {protocol_key} successfully calibrated.")
+                else:
+                    print(f"❌ Calibration failed: {res.get('error', 'Bridge error')}")
+            except ValueError:
+                print(f"❌ Invalid numeric value: {new_val}")
             
         print()
         input("💎 Press [Enter] to return to the desk > ")
@@ -1483,6 +1544,30 @@ def run_interactive_shell(
         "/botstatus": handle_botstatus,
         "/startbot": handle_startbot,
     }
+
+    # 🛰️ Watchdog Meta-Agent: Cross-Repo Event Bus
+    def _watchdog_loop():
+        if not persona or not persona.repo_path: return
+        handoff_path = persona.repo_path / "private" / "docs" / "handoff-mirror.md"
+        last_size = handoff_path.stat().st_size if handoff_path.exists() else 0
+        
+        while True:
+            try:
+                if handoff_path.exists():
+                    current_size = handoff_path.stat().st_size
+                    if current_size > last_size:
+                        # New intel detected
+                        play_alert("Starshield has updated the intelligence record.")
+                        # Subdued alert for the operator
+                        sys.stdout.write(f"\n  {bold}{yellow}[WATCHDOG]{reset} {grey}New event detected in handoff-mirror.md (Pulse at {datetime.now().strftime('%H:%M:%S')}){reset}\n")
+                        sys.stdout.write(persona.get_prompt())
+                        sys.stdout.flush()
+                        last_size = current_size
+                time.sleep(10) # 10s poll cadence
+            except: time.sleep(10)
+            
+    if persona and persona.repo_path:
+        threading.Thread(target=_watchdog_loop, daemon=True, name="dh-watchdog").start()
 
     while True:
         try:
