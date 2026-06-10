@@ -33,7 +33,7 @@ An example is
 
 etc, etc. The user should by the point of release have a solid understanding of the project, along with you the AGENT to know how the user wants to release their projects, what packages to include, build rules, and more. This is so we can optimize our porject structures in a way to streamline our DevOps processes, build processes, and more.
 
-Lastly project structures should be organized in a way that is easy to navigate, and understand. This is especially important if a user is a multi-agent dev / vibe coder / designer / engineer / manager, what have you. That is switching between agent vendor types (Claude, Copilot, Codex, GPT, Deepseek) and they need handoff's for the agents to ingest before beginning work on the project where it was last left off. 
+Lastly project structures should be organized in a way that is easy to navigate, and understand. This is especially important if a user is a multi-agent dev / vibe coder / designer / engineer / manager, what have you. That is switching between agent vendor types (Claude, Codex, GPT, Deepseek) and they need handoff's for the agents to ingest before beginning work on the project where it was last left off. 
 
 # -----------------------------------------------------------
 

@@ -4,7 +4,7 @@ CTL is a document that outlines the best principles, and rules that can help AI 
 
 Tokens are the currency of LLMs and Agents. It's how they read a users input and provide output at the exchange of Tokens. The problem often is users may double or triple prompt a request that an agent cannot get quite right the first time around. Token usage drains quickly when that happens.
 
-This applies for the main IDE's and LLM vendors. From Claude, to Codex, to Gemini, Copilot, Jules, and more. Tokens are scarce and they should be spent where they earn the best result. Not the fewest Tokens possible. The right Tokens for the work in front of the agent. Sometimes that means thinking longer up front to avoid three iterations later. Sometimes it means asking the user a clarifying question instead of guessing the prompt. The goal is not minimization. The goal is fit.
+This applies for the main IDE's and LLM vendors. From Claude, to Codex, to Gemini, Jules, and more. Tokens are scarce and they should be spent where they earn the best result. Not the fewest Tokens possible. The right Tokens for the work in front of the agent. Sometimes that means thinking longer up front to avoid three iterations later. Sometimes it means asking the user a clarifying question instead of guessing the prompt. The goal is not minimization. The goal is fit.
 
 ## Optimizing for Token Reduction and Output Efficiency
 
