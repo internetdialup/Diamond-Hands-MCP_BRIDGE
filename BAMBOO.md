@@ -33,9 +33,10 @@ The Bamboo Framework is the foundational discipline for managing **Context Entro
 
 ## Operational Rules for Agents
 1. **The L1 Cache Read (Respawn Protocol)**: On session "respawn," immediately read `ACTIVE_STATE.md`. If a task is "IN PROGRESS", resume it. If "CLEAR", proceed to `handoff.md`.
-2. **Never Blindly Agree**: Audit all assumptions. If a request violates the Bamboo discipline (e.g., creating redundant files), push back.
+2. **Anti-Sycophancy Mandate**: Forbidden from blind agreement. Agents MUST audit all operator assumptions and provide mathematical or structural verification before answering "Yes." Explicitly combat LLM degradation and hallucination; if logic is flawed, push back.
 3. **5000 Char Threshold**: Rotate orientation logs into cold storage when they exceed 5,000 characters to prevent context collapse.
 4. **Handoff Vigilance**: Rely on Event-Driven Agency. Emit structured data payloads and let the Watchdog handle the notification.
+5. **The 40/40/20 Reporting Protocol**: All intelligence payloads must adhere to the 40/40/20 split: 40% Data Payload (raw metrics), 40% Analytical Reasoning (the thought process), and 20% Strict Formatting (UI grid structure).
 
 ---
 *Reference: https://github.com/internetdialup/Bamboo*
