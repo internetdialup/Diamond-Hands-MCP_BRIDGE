@@ -1,0 +1,12 @@
+version: diamond-hands-bridge/v1
+first_run_completed: false
+public_artifact_json: outputs/daily/daily_report.json
+
+private_algo:
+  repo_path: ../Trading-MCP-Algo
+  bridge_config_path: config/bridge.example.yaml
+  expected_preview_json: outputs/bridge/execution_preview.json
+
+robinhood:
+  mcp_url: https://agent.robinhood.com/mcp/trading
+  onboarding_completed: false

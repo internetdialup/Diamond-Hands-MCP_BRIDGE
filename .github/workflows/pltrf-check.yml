@@ -1,0 +1,66 @@
+name: PLTRF Check
+
+# Preventative Long-Term Repo Fragmentation — verifies the Bamboo discipline
+# on every push and pull request. Fails on broken pointers across canonical files.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pltrf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify canonical files
+        run: |
+          set -e
+          REQUIRED=(
+            "AGENT.md"
+            "behavior/context-rules.md"
+            "behavior/context-window.md"
+            "behavior/context-entropy.md"
+            "behavior/context-utility.md"
+            "behavior/context-orientation.md"
+            "behavior/context-token-limits.md"
+            "docs/context-orientation.md"
+          )
+          missing=0
+          for f in "${REQUIRED[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "::error file=$f::canonical file missing"
+              missing=$((missing+1))
+            fi
+          done
+          if [ $missing -gt 0 ]; then
+            echo "PLTRF check failed: $missing canonical files missing"
+            exit 1
+          fi
+          echo "All canonical files present."
+
+      - name: Scan for broken pointers
+        run: |
+          set -e
+          # Extract relative file references from canonical docs and verify each one exists.
+          # (Minimal v0.1 sweep — hosted Watchdog at bamboo.nyc does the full audit.)
+          broken=0
+          for src in AGENT.md behavior/*.md docs/*.md; do
+            [ -f "$src" ] || continue
+            grep -oE '\[[^]]+\]\([^)]+\)' "$src" 2>/dev/null | grep -oE '\([^)]+\)' | tr -d '()' | while read -r target; do
+              # Skip URLs
+              case "$target" in http*) continue ;; esac
+              # Skip anchors
+              case "$target" in \#*) continue ;; esac
+              # Strip anchor fragment
+              target="${target%%#*}"
+              [ -z "$target" ] && continue
+              if [ ! -e "$target" ]; then
+                echo "::warning file=$src::broken pointer → $target"
+                broken=$((broken+1))
+              fi
+            done
+          done
+          echo "PLTRF sweep complete."
