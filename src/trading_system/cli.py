@@ -40,6 +40,8 @@ from trading_system.cli_functions import (
     print_today_status,
     print_analysis_summary,
     print_market_recap,
+    render_error_badge,
+    render_confluence_matrix,
     animate_status_loading,
     get_wallstreet_time,
     format_human_date,
@@ -392,9 +394,14 @@ def call_mcp_tool(repo_path: Path, tool_name: str, arguments: dict | None = None
             if not raw_response:
                 # Server hung up — drop the handle so the next call respawns.
                 _mcp_shutdown()
-                return None
+                return {"error": {"code": "BRIDGE_HUNG_UP", "message": "The private algo bridge terminated unexpectedly."}}
 
             response = json.loads(raw_response)
+
+            # --- MIT Extraction: Structured Error Envelopes (v0.1.6) ---
+            if "error" in response:
+                return {"error": response["error"]}
+
             result = None
             if "result" in response and "structuredContent" in response["result"]:
                 result = response["result"]["structuredContent"]
@@ -407,11 +414,10 @@ def call_mcp_tool(repo_path: Path, tool_name: str, arguments: dict | None = None
                     _mcp_cache[cache_key] = (time.time(), result)
 
             return result
-        except (KeyboardInterrupt, Exception):
+            except (KeyboardInterrupt, Exception) as e:
             # Server may be in a bad state — force respawn next call.
             _mcp_shutdown()
-            return None
-
+            return {"error": {"code": "BRIDGE_EXCEPTION", "message": str(e)}}
 import importlib.util
 
 class PersonaManager:
@@ -513,7 +519,8 @@ class PersonaManager:
             "ai": "dh_analyze_ai_narrative",
             "mag7": "dh_analyze_mag7",
             "team": "dh_get_team_status",
-            "wrappers": "dh_get_analysis_wrappers"
+            "wrappers": "dh_get_analysis_wrappers",
+            "confluence": "dh_get_confluence_matrix"
         }
         tool = tool_map.get(module_name)
         if not tool:
@@ -1019,9 +1026,16 @@ def run_interactive_shell(
         data = persona.get_intel_module(module)
         if not data:
             print(f"  {yellow}No active intel for '{module}'. Module may be standby.{reset}")
+        elif "error" in data:
+            print(f"  {render_error_badge(data['error'])}")
         else:
             # Generic Payload Renderer (v0.15.0 protocol)
             title = data.get("title", module.upper())
+            
+            # Special Case: Confluence Matrix
+            if module == "confluence":
+                render_confluence_matrix(data)
+            
             content = data.get("content")
             metrics = data.get("metrics", {})
             timeline = data.get("timeline", [])

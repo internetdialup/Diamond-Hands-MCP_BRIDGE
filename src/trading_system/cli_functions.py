@@ -63,6 +63,40 @@ def play_alert(message: str) -> None:
         try: subprocess.run(["say", "-v", "Samantha", message], check=False)
         except Exception: pass
 
+def render_error_badge(error: dict) -> str:
+    """Renders a beautiful status badge for structured errors (MIT pattern)."""
+    red, yellow, reset, bold = "\033[31m", "\033[33m", "\033[0m", "\033[1m"
+    code = error.get("code", "UNKNOWN")
+    msg = error.get("message", "")
+    
+    if "THROTTLED" in code or "RATE" in code:
+        return f"{yellow}[🚦 API THROTTLED]{reset} {msg}"
+    if "HUNG_UP" in code or "OFFLINE" in code:
+        return f"{red}[👻 BRIDGE OFFLINE]{reset} {msg}"
+    return f"{red}[🛑 ERROR: {code}]{reset} {msg}"
+
+def render_confluence_matrix(data: dict) -> None:
+    """Renders a high-fidelity Timeframe Confluence Matrix (MIT pattern)."""
+    green, yellow, red, grey, reset, bold = "\033[32m", "\033[33m", "\033[31m", "\033[90m", "\033[0m", "\033[1m"
+    tframes = data.get("timeframes", ["1m", "5m", "15m", "1h", "4h", "1D", "1W"])
+    indicators = data.get("indicators", ["RSI", "MACD", "EMA", "SUPER"])
+    matrix = data.get("matrix", {}) # { "Indicator": { "1m": "BUY", ... } }
+    
+    print(f"  {bold}Timeframe Confluence Matrix:{reset}")
+    header = f"{'Indicator':<12} │ " + " │ ".join([f"{tf:<5}" for tf in tframes])
+    print(f"  {grey}{header}{reset}")
+    print(f"  {grey}{'─' * len(header)}{reset}")
+    
+    for ind in indicators:
+        row = f"  {bold}{ind:<12}{reset} │ "
+        scores = []
+        for tf in tframes:
+            val = matrix.get(ind, {}).get(tf, "WAIT")
+            color = green if "BUY" in val else red if "SELL" in val else yellow
+            scores.append(f"{color}{val:<5}{reset}")
+        print(row + " │ ".join(scores))
+    print()
+
 def render_banner(connected: bool | None = None, rh_connected: bool | None = None, animate: bool = True, persona: PersonaManager | None = None) -> None:
     if persona and persona.banner_renderer:
         try: persona.banner_renderer(); return
