@@ -425,10 +425,23 @@ def call_mcp_tool(repo_path: Path, tool_name: str, arguments: dict | None = None
                     result = {**result, **decrypted}
                     del result["secure_payload"]
 
-            # Update cache
+            # Update cache with bounding and TTL eviction
             if result:
                 with _mcp_cache_lock:
-                    _mcp_cache[cache_key] = (time.time(), result)
+                    now = time.time()
+                    # Evict stale entries
+                    stale_keys = [k for k, (ts, _) in _mcp_cache.items() if now - ts > 5.0]
+                    for k in stale_keys:
+                        del _mcp_cache[k]
+                        
+                    # Bound cache size to prevent memory leak
+                    if len(_mcp_cache) > 50:
+                        # Remove oldest entries
+                        oldest_keys = sorted(_mcp_cache.keys(), key=lambda k: _mcp_cache[k][0])[:10]
+                        for k in oldest_keys:
+                            del _mcp_cache[k]
+                            
+                    _mcp_cache[cache_key] = (now, result)
 
             return result
         except (KeyboardInterrupt, Exception) as e:
@@ -688,13 +701,13 @@ def run_interactive_shell(
             print_today_status(last_result, tracked_tickers, persona=persona)
             
             # Gemini-style Prompt Table (v0.2.1)
-            print(f"  {bold}───────────────────────────── READY TO SHIP ─────────────────────────────{reset}")
-            print(f"  │ {bold}Action{reset}            │ {bold}Shortcut{reset} │ {bold}Status{reset}                         │")
+            print(f"  {bold}───────────────────────── OPERATOR DIRECTIVES ─────────────────────────{reset}")
+            print(f"  │ {bold}How can I help you, boss?{reset}{' ':<38} │")
             print(f"  ├───────────────────┼──────────┼────────────────────────────────┤")
-            print(f"  │ Deep Analysis     │ A        │ {green}READY{reset}                          │")
-            print(f"  │ Ticker Sniper     │ S        │ {green}ACTIVE{reset}                         │")
-            print(f"  │ Advanced Intel    │ M        │ {yellow}STANDBY{reset}                        │")
-            print(f"  │ Return to Desk    │ Enter    │ {cyan}EXIT{reset}                           │")
+            print(f"  │ Deep Dive Report  │ (A)      │ {green}READY TO ANALYZE{reset}               │")
+            print(f"  │ Ticker Sniper     │ (S)      │ {green}ACTIVE ON TAPE{reset}                 │")
+            print(f"  │ Advanced Ops      │ (M)      │ {yellow}COMMANDS WAITING{reset}               │")
+            print(f"  │ Exit to Terminal  │ (Enter)  │ {cyan}STANDBY{reset}                        │")
             print(f"  └───────────────────┴──────────┴────────────────────────────────┘")
             print()
             
@@ -1286,9 +1299,9 @@ def run_interactive_shell(
         print()
 
     def handle_portfolio() -> None:
-        print("════════════════════════════════════════════════════════════")
+        print("══════════════════════════════════════════════════════════════════════════════════")
         print(f"💼 {bold}Institutional Portfolio & Capital Intelligence{reset}")
-        print("═" * 60)
+        print("═" * 80)
 
         animate_status_loading("Aggregating Risk-Adjusted Exposure via multi-agent ensemble")
 
@@ -1301,11 +1314,13 @@ def run_interactive_shell(
         disagreement = hm.get("disagreement", 0.0) if hm else 0.0
         efficiency = (1.0 - disagreement) # Higher efficiency when consensus is high
 
-        print(f"  {bold}Ensemble Consensus:{reset} {cyan}{consensus:+.2f}{reset} | {bold}Capital Efficiency:{reset} {create_barchart(efficiency, width=15)} ({int(efficiency*100)}%)")
-        print("─" * 60)
+        cons_line = f"  {bold}Ensemble Consensus:{reset} {cyan}{consensus:+.2f}{reset} | {bold}Capital Efficiency:{reset} {create_barchart(efficiency, width=15)} ({int(efficiency*100)}%)"
+        print(f"{cons_line}{' ' * (80 - len(strip_ansi(cons_line)))}")
+        print("─" * 80)
 
         # 2. Risk-Adjusted Exposure Table
-        print(f"{bold}{'Asset':<10} {'Allocation':<15} {'Risk Adj.'}{reset}")
+        header = f"{bold}{'Asset':<10} {'Allocation':<15} {'Risk Adj.'}{reset}"
+        print(f"{header}{' ' * (80 - len(strip_ansi(header)))}")
         print(f"{grey}{'-'*10} {'-'*15} {'-'*15}{reset}")
 
         # Mocking the portfolio distribution based on consensus
@@ -1317,13 +1332,16 @@ def run_interactive_shell(
 
         for asset, alloc, color in assets:
             adj = alloc * (1.0 - (h.get("hm_disagreement_score", 0.1) if h else 0.1))
-            print(f"{asset:<10} {color}{alloc:>+14.2%}{reset}  {adj:>+14.2%}")
-        print("─" * 60)
+            row = f"{asset:<10} {color}{alloc:>+14.2%}{reset}  {adj:>+14.2%}"
+            print(f"{row}{' ' * (80 - len(strip_ansi(row)))}")
+        print("─" * 80)
+        
         # 3. Solver Status
         if h and h.get("portfolio_qp_iters", 0) > 0:
-            print(f"  {bold}QP Solver:{reset} {green}OPTIMIZED{reset} ({h['portfolio_qp_iters']} iterations)")
+            status_line = f"  {bold}QP Solver:{reset} {green}OPTIMIZED{reset} ({h['portfolio_qp_iters']} iterations)"
         else:
-            print(f"  {bold}Solver:{reset} {yellow}ANALYTICAL{reset}")
+            status_line = f"  {bold}Solver:{reset} {yellow}ANALYTICAL{reset}"
+        print(f"{status_line}{' ' * (80 - len(strip_ansi(status_line)))}")
 
         print()
         input("💎 Press [Enter] to return to the desk > ")
@@ -1707,6 +1725,18 @@ def run_interactive_shell(
                 traceback.print_exc()
 
 
+class GarbageCollector:
+    """Prunes stale artifacts to maintain a micro-footprint (kb speed)."""
+    @staticmethod
+    def prune(output_dir: Path):
+        if not output_dir.exists(): return
+        now = time.time()
+        for f in output_dir.glob("**/*.json"):
+            # Prune transient files older than 24 hours
+            if now - f.stat().st_mtime > 86400:
+                try: f.unlink()
+                except: pass
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1715,9 +1745,10 @@ def main(argv: list[str] | None = None) -> int:
     check_for_updates()
     
     # 🏁 ROBUST PATH RESOLUTION 🏁
-    # If we are running from an installed bin, relative paths like 'config/...'
-    # will fail unless we resolve them relative to the project root.
     project_root = Path(__file__).resolve().parents[2]
+    
+    # 🧹 KB-SPEED: PRUNE STALE ARTIFACTS
+    GarbageCollector.prune(project_root / "outputs")
     
     config_path = Path(args.config)
     if not config_path.exists() and not config_path.is_absolute():

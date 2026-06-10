@@ -274,7 +274,8 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
                 
                 if state == "TRAINING":
                     pulse = f"{bold}{pink}● {state}{reset} | {bold}{p_name}:{reset} {drill} (#{count})"
-                    print(f"{grey}║{reset}  {pulse:<80}{' ' * (80 - len(strip_ansi(pulse)))} {grey}║{reset}")
+                    padding = 80 - len(strip_ansi(pulse))
+                    print(f"{grey}║{reset}  {pulse}{' ' * max(0, padding)} {grey}║{reset}")
             except: pass
 
     print(f"{grey}╠══════════════════════════════════════════════════════════════════════════════════╣{reset}")
@@ -285,7 +286,8 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
             # --- Security: Scrub Private Terms ---
             headline = alpha.get('headline', '')[:52].replace("UMADA", "[REDACTED]")
             alpha_head = f"{bold}🕵️ Institutional Alpha:{reset} {headline}"
-            print(f"{grey}║{reset}  {alpha_head}{' ' * (80 - len(strip_ansi(alpha_head)))} {grey}║{reset}")
+            padding = 80 - len(strip_ansi(alpha_head))
+            print(f"{grey}║{reset}  {alpha_head}{' ' * max(0, padding)} {grey}║{reset}")
             print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{cyan}🚀 MARKET SNAPSHOT{reset}{' ':<63} {grey}║{reset}")
     print(f"{grey}║{reset}  {bold}{'TICKER':<10} {'PRICE':<10} {'CHG %':<10} {'BIAS':<10} {'CONVICTION':<18} {'SETUP'}{reset}  {grey}║{reset}")
@@ -310,13 +312,13 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
         chg_color = green if "+" in chg else red if "-" in chg else yellow
         conf_chart = create_barchart(s.confidence, width=15)
         row_content = f"{display_ticker:<10} {price:<10} {chg_color}{chg:<10}{reset} {bias_color}{s.direction_bias.upper():<10}{reset} {conf_chart} ({int(s.confidence*100):>2}%) {s.setup_class[:14]:<14}"
-        # Ensure static length 80
+        # Force static length 80
         padding = 80 - len(strip_ansi(row_content))
         print(f"{grey}║{reset}  {row_content}{' ' * max(0, padding)} {grey}║{reset}")
     print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{green}📰 MACRO CATALYSTS{reset}{' ':<61} {grey}║{reset}")
     
-    # --- Deduplicate News Topics ---
+    # --- Deduplicate News Symbols ---
     news_seen = set()
     news_count = 0
     for news in report.top_12_news:
@@ -334,9 +336,8 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print(f"{grey}║{reset}{' ':<82}{grey}║{reset}")
     print(f"{grey}║{reset}  {bold}{pink}📅 EXPECTED TOMORROW ({day_name.upper()}){reset}{' ' * (80 - len(strip_ansi(f'📅 EXPECTED TOMORROW ({day_name.upper()})')))} {grey}║{reset}")
     
-    # --- Refine Economy/Earnings Lane ---
-    full_econ = "ECONOMY" if events else "NORMAL"
-    econ_line = f" • {bold}{full_econ:<8}{reset} │ {', '.join(events)[:65]}"
+    # --- Refine ECONOMY Lane (Phase 16.C logic) ---
+    econ_line = f" • {bold}ECONOMY {reset} │ {', '.join(events)[:65]}"
     padding = 80 - len(strip_ansi(econ_line))
     print(f"{grey}║{reset}  {econ_line}{' ' * max(0, padding)} {grey}║{reset}")
     
@@ -346,7 +347,7 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
         padding = 80 - len(strip_ansi(earn_line))
         print(f"{grey}║{reset}  {earn_line}{' ' * max(0, padding)} {grey}║{reset}")
     else:
-        # Static length row for no earnings
+        # Static row for zero earnings
         none_line = f" • {bold}EARN    {reset} │ none"
         padding = 80 - len(strip_ansi(none_line))
         print(f"{grey}║{reset}  {none_line}{' ' * max(0, padding)} {grey}║{reset}")
