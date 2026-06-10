@@ -12,6 +12,7 @@ build/
 outputs/
 config/diamond-hands.local.yaml
 TODO.private.md
+logo-ascii.md
 
 data/raw/
 data/intermediate/
