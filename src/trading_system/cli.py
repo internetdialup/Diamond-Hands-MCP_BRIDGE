@@ -1863,14 +1863,26 @@ def run_interactive_shell(
 class GarbageCollector:
     """Prunes stale artifacts to maintain a micro-footprint (kb speed)."""
     @staticmethod
-    def prune(output_dir: Path):
-        if not output_dir.exists(): return
-        now = time.time()
-        for f in output_dir.glob("**/*.json"):
-            # Prune transient files older than 24 hours
-            if now - f.stat().st_mtime > 86400:
-                try: f.unlink()
-                except: pass
+    def prune(project_root: Path):
+        # 1. Prune local transient JSONs (>24h)
+        local_outputs = project_root / "outputs"
+        if local_outputs.exists():
+            now = time.time()
+            for f in local_outputs.glob("**/*.json"):
+                if now - f.stat().st_mtime > 86400:
+                    try: f.unlink()
+                    except: pass
+        
+        # 2. Prune massive sibling Tape Logs (>48h)
+        # Prevents the "8GB bloat" issue
+        algo_tape = project_root.parent / "Trading-MCP-Algo" / "outputs" / "tape"
+        if algo_tape.exists():
+            now = time.time()
+            for f in algo_tape.glob("*.jsonl"):
+                # Prune tape logs older than 2 days
+                if now - f.stat().st_mtime > 172800:
+                    try: f.unlink()
+                    except: pass
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
@@ -1879,10 +1891,10 @@ def main(argv: list[str] | None = None) -> int:
     # 📡 BACKGROUND UPDATE CHECK
     check_for_updates()
     
-    # 🧹 KB-SPEED: PRUNE STALE ARTIFACTS
+    # 🧹 KB-SPEED: PRUNE STALE ARTIFACTS (Local + Sibling Tape)
     # Project root resolution for standalone binary execution
     project_root = Path(__file__).resolve().parents[2]
-    GarbageCollector.prune(project_root / "outputs")
+    GarbageCollector.prune(project_root)
     
     config_path = Path(args.config)
     if not config_path.exists() and not config_path.is_absolute():
