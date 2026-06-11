@@ -69,10 +69,16 @@ def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
 def play_alert(message: str) -> None:
     if sys.platform == "darwin":
         try: 
-            # Non-blocking voice alert
-            subprocess.Popen(["say", "-v", "Samantha", message], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception: 
-            pass
+            # Nightshade Voice Spec: Prefer 'Daniel' (UK) for institutional feel
+            voice = "Daniel"
+            # Quick check if voice exists (simplistic)
+            # Use Popen to keep it non-blocking
+            subprocess.Popen(["say", "-v", voice, message], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            try:
+                subprocess.Popen(["say", "-v", "Samantha", message], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except Exception:
+                pass
 
 class KineticSpinner:
     """A threaded context manager for buttery smooth kinetic animations (v0.3.0)."""
@@ -572,8 +578,8 @@ def print_analysis_summary(result: PipelineResult, target_symbol: str | None = N
         wrappers = persona.get_intel_module("wrappers", ticker=top_symbol.ticker)
         if wrappers and isinstance(wrappers, list):
             for w in wrappers:
-                title = w.get("title", "INTELLIGENCE")
-                content = w.get("content", "No data.")
+                title = str(w.get("title", "INTELLIGENCE"))
+                content = str(w.get("content", "No data."))
                 color = w.get("color", cyan)
                 icon = w.get("icon", "🕵️")
                 

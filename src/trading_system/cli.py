@@ -133,6 +133,7 @@ CORE_COMMAND_SPECS = [
     CommandSpec("/jensen", "NVIDIA & AI hardware intelligence pulse"),
     CommandSpec("/wsb", "WallStreetBets retail sentiment & squeeze tracking"),
     CommandSpec("/ask", "Ask your manager about specific tickers"),
+    CommandSpec("/say", "Test the institutional TTS voice"),
     CommandSpec("/more", "Show all advanced modules & settings"),
 ]
 
@@ -198,6 +199,9 @@ COMMAND_ALIASES = {
     "/twitter": "/intel",
     "/x": "/intel",
     "/sentiment": "/intel",
+    "/say": "/say",
+    "/speak": "/say",
+    "/talk": "/say",
     "/intel": "/intel",
     "/debate": "/debate",
     "/transcript": "/debate",
@@ -563,8 +567,7 @@ class PersonaManager:
         weights = [p[1] for p in self.prompts]
         base_prompt = random.choices(texts, weights=weights, k=1)[0]
         
-        # Inject the heartbeat pulse
-        return f"{get_heartbeat_frame()}{base_prompt}"
+        return base_prompt
 
     def get_intel_module(self, module_name: str, **kwargs) -> dict | None:
         """Fetches dynamic intelligence payloads from the private MCP server.
@@ -1729,6 +1732,11 @@ def run_interactive_shell(
             time.sleep(10)
         print("✅ Stress test completed (should have timed out and retried).")
 
+    def handle_say() -> None:
+        text = input("💎 Text to speak > ").strip()
+        if text:
+            play_alert(text)
+
     handlers: dict[str, Callable[[], None]] = {
         "/commands": handle_commands,
         "/viewall": handle_viewall,
@@ -1740,6 +1748,7 @@ def run_interactive_shell(
         "/jensen": handle_jensen,
         "/trumptracker": handle_trumptracker,
         "/stresstest": handle_stresstest,
+        "/say": handle_say,
         "/todaysupdate": handle_todaysupdate,
         "/analyze": handle_analyze,
         "/marketrecap": handle_marketrecap,
