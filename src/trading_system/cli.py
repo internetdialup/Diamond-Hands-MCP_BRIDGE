@@ -43,6 +43,9 @@ from trading_system.cli_functions import (
     render_error_badge,
     render_confluence_matrix,
     animate_status_loading,
+    animate_diamond_hands,
+    KineticSpinner,
+    with_resilience,
     get_wallstreet_time,
     format_human_date,
     cyan_gradient,
@@ -61,6 +64,11 @@ if TYPE_CHECKING:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Diamond Hands public bridge CLI for Robinhood-first market intelligence.",
+    )
+    parser.add_argument(
+        "--force-interactive",
+        action="store_true",
+        help="Force interactive mode even in non-TTY environments (for automation).",
     )
     parser.add_argument(
         "mode",
@@ -121,6 +129,9 @@ CORE_COMMAND_SPECS = [
     CommandSpec("/todaysupdate", "Show today's market summary"),
     CommandSpec("/analyze", "Show the full deep-dive analysis report"),
     CommandSpec("/portfolio", "View buying power and current positions"),
+    CommandSpec("/trumptracker", "Track political catalysts and sector impacts"),
+    CommandSpec("/jensen", "NVIDIA & AI hardware intelligence pulse"),
+    CommandSpec("/wsb", "WallStreetBets retail sentiment & squeeze tracking"),
     CommandSpec("/ask", "Ask your manager about specific tickers"),
     CommandSpec("/more", "Show all advanced modules & settings"),
 ]
@@ -150,7 +161,6 @@ EXPERIMENTAL_COMMAND_SPECS = [
     CommandSpec("/buildagent", "Custom strategy & model setup wizard"),
     CommandSpec("/marketrecap", "Show the market recap view"),
     CommandSpec("/marketnews", "Show the market news view"),
-    CommandSpec("/tickersniper", "Track up to three symbols locally"),
     CommandSpec("/intel", "View dynamic intelligence modules (e.g. /intel social)"),
     CommandSpec("/system", "Institutional Control Center & Health Hub"),
     CommandSpec("/risk", "Defensive Command Center & Safety Bounds"),
@@ -178,6 +188,10 @@ COMMAND_ALIASES = {
     "/marketnews": "/marketnews",
     "/news": "/marketnews",
     "/portfolio": "/portfolio",
+    "/trumptracker": "/trumptracker",
+    "/tt": "/trumptracker",
+    "/jensen": "/jensen",
+    "/nvda": "/jensen",
     "/wsb": "/wsb",
     "/wallstbets": "/wsb",
     "/social": "/intel",
@@ -630,13 +644,56 @@ def show_startup_intro(connected: bool | None = None, rh_connected: bool | None 
     sys.stdout.write("\033]0;💎 Diamond Hands\007")
     sys.stdout.flush()
 
+    if animate:
+        animate_diamond_hands()
+
     render_banner(connected, rh_connected, animate=animate, persona=persona)
     print_intro_command_table(connected, CORE_COMMAND_SPECS, PRIVATE_OPERATOR_COMMAND_SPECS)
 
 
-def run_pipeline(config_path: str, output_dir: str | None) -> "PipelineResult":
+def load_active_state() -> list[str]:
+    """Loads tracked_tickers from the L1 Cache (ACTIVE_STATE.md)."""
+    default_tickers = ["$SPY", "$QQQ"]
+    path = Path("ACTIVE_STATE.md")
+    if not path.exists(): return default_tickers
+    try:
+        content = path.read_text()
+        match = re.search(r"## Sniper Cart:\n- (.*)", content)
+        if match:
+            return [t.strip() for t in match.group(1).split(",")]
+    except: pass
+    return default_tickers
+
+def save_active_state(tracked_tickers: list[str]):
+    """Saves tracked_tickers to the L1 Cache (ACTIVE_STATE.md)."""
+    path = Path("ACTIVE_STATE.md")
+    content = ""
+    if path.exists():
+        content = path.read_text()
+        # Replace or append Sniper Cart section
+        cart_str = f"## Sniper Cart:\n- {', '.join(tracked_tickers)}"
+        if "## Sniper Cart:" in content:
+            content = re.sub(r"## Sniper Cart:\n- .*", cart_str, content)
+        else:
+            content += f"\n{cart_str}\n"
+    else:
+        content = f"# Transient Memory Cache (L1)\n\n## Sniper Cart:\n- {', '.join(tracked_tickers)}\n"
+    
+    try: path.write_text(content)
+    except: pass
+
+def run_pipeline(config_path: str, output_dir: str | None, extra_symbols: list[str] = None) -> "PipelineResult":
     from trading_system.pipeline.daily import DailyPipeline  # lazy: pulls yfinance
     config = load_runtime_config(Path(config_path))
+    
+    # --- Dynamic Symbol Injection (v0.2.5) ---
+    if extra_symbols:
+        clean_extra = [s.replace("$", "").upper() for s in extra_symbols]
+        current_symbols = set(config.universe.symbols)
+        for s in clean_extra:
+            if s not in current_symbols:
+                config.universe.symbols.append(s)
+                
     if output_dir:
         config.reporting.output_dir = Path(output_dir)
     pipeline = DailyPipeline(config)
@@ -661,7 +718,7 @@ def run_interactive_shell(
     persona: PersonaManager | None = None,
 ) -> int:
     last_result: PipelineResult | None = None
-    tracked_tickers: list[str] = ["$SPY", "$QQQ"]
+    tracked_tickers: list[str] = load_active_state()
     voice_enabled: bool = False # Default OFF
     # Nightshade Visual Spec (v0.20.4)
     bold = "\033[1m"
@@ -712,27 +769,32 @@ def run_interactive_shell(
         print(bridge_status_note)
         print()
 
+    @with_resilience(timeout=30)
     def handle_refresh() -> None:
         nonlocal last_result
         print("════════════════════════════════════════════════════════════")
-        animate_status_loading("Forcing a fresh market pulse")
-        last_result = run_pipeline(args.config, args.output_dir)
+        with KineticSpinner("Forcing a fresh market pulse"):
+            last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         print("✅ Live data refreshed.")
         print()
 
     def handle_viewall() -> None:
         print_viewall_command_table(CORE_COMMAND_SPECS, PRIVATE_OPERATOR_COMMAND_SPECS, EXPERIMENTAL_COMMAND_SPECS)
 
+    @with_resilience(timeout=60)
     def handle_todaysupdate() -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Sniffing out today's alpha")
-            last_result = run_pipeline(args.config, args.output_dir)
+            with KineticSpinner("Sniffing out today's alpha", voice=True):
+                last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         
         while True:
             # Cinematic Home and Clear for "Live" feel
             sys.stdout.write('\033[H\033[J')
             sys.stdout.flush()
+            
+            # Persistent Logo (v0.2.5)
+            render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed, animate=False, persona=persona)
             
             print_today_status(last_result, tracked_tickers, persona=persona)
             
@@ -752,7 +814,10 @@ def run_interactive_shell(
             sys.stdout.write(countdown_msg)
             sys.stdout.flush()
             
-            # Non-blocking wait for 15s
+            # Non-blocking wait for 15s (Automation Friendly v0.3.8)
+            if not sys.stdin.isatty():
+                break # Exit loop immediately in non-interactive mode
+                
             import select
             rlist, _, _ = select.select([sys.stdin], [], [], 15)
             
@@ -762,7 +827,9 @@ def run_interactive_shell(
                     break
                 if choice in ["a", "analyze"]:
                     print()
-                    print_analysis_summary(last_result, persona=persona)
+                    # --- Sniper Logic (v0.2.5) ---
+                    target = tracked_tickers[-1] if tracked_tickers else None
+                    print_analysis_summary(last_result, target_symbol=target, persona=persona)
                     input("\n💎 Press [Enter] to resume live board > ")
                 elif choice in ["s", "sniper"]:
                     handle_tickersniper()
@@ -791,48 +858,47 @@ def run_interactive_shell(
         print("Status: IN RECRUITMENT 🧪")
         print()
 
+    @with_resilience(timeout=30)
     def handle_marketrecap() -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Seeing what broke after the bell")
-            last_result = run_pipeline(args.config, args.output_dir)
+            with KineticSpinner("Seeing what broke after the bell"):
+                last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         print_market_recap(last_result, persona=persona)
 
+    @with_resilience(timeout=30)
     def handle_marketnews() -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Reading the tape")
-            last_result = run_pipeline(args.config, args.output_dir)
+            with KineticSpinner("Brewing coffee and parsing macro noise"):
+                last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         # Using market recap as proxy for news for now
         print_market_recap(last_result, persona=persona)
 
+    @with_resilience(timeout=30)
     def handle_analyze(symbol: str | None = None) -> None:
         nonlocal last_result
         if last_result is None:
-            animate_status_loading("Crunching the numbers", voice=True)
-            last_result = run_pipeline(args.config, args.output_dir)
+            with KineticSpinner("Crunching the numbers", voice=True):
+                last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
             play_alert("Deep analysis complete.")
-        print_analysis_summary(last_result, target_symbol=symbol, persona=persona)
+        
+        # --- Sniper Logic (v0.2.5) ---
+        # Default to the most recently added sniper ticker if none provided
+        target = symbol
+        if not target and tracked_tickers:
+            target = tracked_tickers[-1]
+            
+        print_analysis_summary(last_result, target_symbol=target, persona=persona)
 
-    def handle_marketrecap() -> None:
-        nonlocal last_result
-        if last_result is None:
-            animate_status_loading("Seeing what broke after the bell")
-            last_result = run_pipeline(args.config, args.output_dir)
-        print_market_recap(last_result, persona=persona)
-
-    def handle_marketnews() -> None:
-        nonlocal last_result
-        if last_result is None:
-            animate_status_loading("Brewing coffee and parsing macro noise")
-            last_result = run_pipeline(args.config, args.output_dir)
-        print_market_news(last_result)
+    def handle_jensen() -> None:
+        handle_intel("jensen")
 
     def handle_runstrategy() -> None:
         nonlocal last_result
         if last_result is None:
             animate_status_loading("Consulting the quant gods")
-            last_result = run_pipeline(args.config, args.output_dir)
+            last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         
         # Use private smoke renderer if available (The Ghost)
         if persona:
@@ -888,6 +954,7 @@ def run_interactive_shell(
                 removed = tracked_tickers.pop(2) # Keep first 2 (SPY, QQQ) usually
                 print(f"Cart full! Booting {removed} to make room.")
             tracked_tickers.append(ticker)
+            save_active_state(tracked_tickers)
             print(f"Added {ticker} to the sniper cart.")
             print(f"⚔️ {bold}Now tracking in Actionable Setups{reset}")
         print(f"Updated Sniper Cart: {', '.join(tracked_tickers)}")
@@ -912,7 +979,7 @@ def run_interactive_shell(
                     
                     render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
                     print(f"\033[1;32m🚀 LIVE AUTOPILOT ACTIVE (Refreshing every 30s)\033[0m")
-                    res = run_pipeline(args.config, args.output_dir)
+                    res = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
                     print_today_status(res, tracked_tickers)
                     time.sleep(30)
             except KeyboardInterrupt:
@@ -928,16 +995,20 @@ def run_interactive_shell(
     def handle_clear() -> None:
         sys.stdout.write('\033[H\033[J')
         sys.stdout.flush()
+        # Ensure persistence (v0.2.5)
         show_startup_intro(verification.compatible, bridge_config.robinhood.onboarding_completed, persona=persona, animate=False)
 
+    @with_resilience(timeout=15)
     def handle_verifybridge() -> None:
         print("════════════════════════════════════════════════════════════")
-        print_bridge_verification(verification.notes)
+        with KineticSpinner("Probing private ALGO lane", duration=1.5):
+            print_bridge_verification(verification.notes)
         if verification.compatible:
             play_alert("Bridge verified. Private lane is hot.")
         else:
             play_alert("Bridge failure. Private lane is offline.")
 
+    @with_resilience(timeout=30)
     def handle_handoff() -> None:
         nonlocal last_result
         print("════════════════════════════════════════════════════════════")
@@ -947,10 +1018,11 @@ def run_interactive_shell(
             print()
             return
         if last_result is None:
-            animate_status_loading("Building analysis for handoff")
-            last_result = run_pipeline(args.config, args.output_dir)
+            with KineticSpinner("Building analysis for handoff"):
+                last_result = run_pipeline(args.config, args.output_dir, extra_symbols=tracked_tickers)
         try:
-            handoff = hand_off_to_private_algo(bridge_config, last_result.json_path)
+            with KineticSpinner("Packaging research artifacts"):
+                handoff = hand_off_to_private_algo(bridge_config, last_result.json_path)
             print("Diamond Hands private handoff completed.")
             play_alert("Intelligence promoted. Starshield has the watch.")
             if handoff.stdout.strip():
@@ -993,15 +1065,15 @@ def run_interactive_shell(
     def handle_risk() -> None:
         handle_private_algo_command("risk", ["session", "risk"])
 
+    @with_resilience(timeout=15)
     def handle_botstatus() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"🤖 {bold}DiamondHands Execution Cockpit{reset}")
         print("═" * 60)
         
-        animate_status_loading("Probing private execution daemon")
-        
-        # 1. Daemon Status via MCP
-        h = persona.get_heuristics()
+        with KineticSpinner("Probing private execution daemon"):
+            # 1. Daemon Status via MCP
+            h = persona.get_heuristics()
         status_color = green if h else red
         status_text = "ACTIVE" if h else "OFFLINE"
         
@@ -1022,6 +1094,7 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=15)
     def handle_stop() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"🚨 {bold}{red}EMERGENCY STOP: DSR KILL-SWITCH{reset}")
@@ -1029,9 +1102,9 @@ def run_interactive_shell(
         
         confirm = input(f"  {bold}DANGER:{reset} This will pause all automated execution. Confirm? [y/N] > ").strip().lower()
         if confirm == 'y':
-            animate_status_loading("Transmitting KILL signal to private bridge")
-            # Call dh_kill_switch MCP tool
-            res = call_mcp_tool(persona.repo_path, "dh_kill_switch", {"command": "arm"})
+            with KineticSpinner("Transmitting KILL signal to private bridge"):
+                # Call dh_kill_switch MCP tool
+                res = call_mcp_tool(persona.repo_path, "dh_kill_switch", {"command": "arm"})
             if res and res.get("status") == "ARMED":
                 print(f"\n  {green}✅ KILL-SWITCH ARMED. Execution nodes fail-closed.{reset}")
                 play_alert("Emergency stop confirmed. Bridge is locked.")
@@ -1130,14 +1203,15 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=20)
     def handle_intel(module: str | None = None) -> None:
         print("════════════════════════════════════════════════════════════")
         module = module or input("💎 Module to query (alpha/social/political/etc) > ").strip().lower()
         if not module: return
         
-        animate_status_loading(f"Querying private intelligence node: {module}")
+        with KineticSpinner(f"Querying private intelligence node: {module}"):
+            data = persona.get_intel_module(module)
 
-        data = persona.get_intel_module(module)
         if not data:
             print(f"  {yellow}No active intel for '{module}'. Module may be standby.{reset}")
         elif "error" in data:
@@ -1183,6 +1257,7 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=15)
     def handle_debate(symbol: str | None = None) -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"⚔️ {bold}Intelligence Team Debate Transcript{reset}")
@@ -1192,9 +1267,9 @@ def run_interactive_shell(
         if not target: return
         target = target.replace("$", "")
         
-        animate_status_loading(f"Retrieving multi-agent deliberation for {target}")
+        with KineticSpinner(f"Retrieving multi-agent deliberation for {target}"):
+            data = persona.get_debate_transcript(target)
         
-        data = persona.get_debate_transcript(target)
         stages = data.get("stages", []) if data else []
         
         if not stages:
@@ -1328,16 +1403,16 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=15)
     def handle_portfolio() -> None:
         print("══════════════════════════════════════════════════════════════════════════════════")
         print(f"💼 {bold}Institutional Portfolio & Capital Intelligence{reset}")
         print("═" * 80)
 
-        animate_status_loading("Aggregating Risk-Adjusted Exposure via multi-agent ensemble")
-
-        # Pull data from Ensemble and HFT Heuristics
-        hm = persona.get_intel_module("ensemble")
-        h = persona.get_heuristics()
+        with KineticSpinner("Aggregating Risk-Adjusted Exposure via multi-agent ensemble"):
+            # Pull data from Ensemble and HFT Heuristics
+            hm = persona.get_intel_module("ensemble")
+            h = persona.get_heuristics()
 
         # 1. Ensemble Consensus & Capital Efficiency
         consensus = hm.get("consensus_weight", 0.0) if hm else 0.0
@@ -1377,14 +1452,15 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=15)
     def handle_risk() -> None:
-        print("════════════════════════════════════════════════════════════")
+        print("══════════════════════════════════════════════════════════════════════════════════")
         print(f"🛡️ {bold}Defensive Command Center: Risk & Safety Bounds{reset}")
-        print("═" * 60)
-        
-        animate_status_loading("Retrieving Risk Scorecard & Circuit Breakers")
-        
-        h = persona.get_heuristics()
+        print("═" * 80)
+
+        with KineticSpinner("Retrieving Risk Scorecard & Circuit Breakers"):
+            h = persona.get_heuristics()
+
         
         # 1. Global Circuit Breakers
         breach = h.get("dsr_gate_breach", False) if h else False
@@ -1414,6 +1490,7 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=30)
     def handle_wizard() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"🧙 {bold}Diamond Hands: Intelligence Onboarding Wizard{reset}")
@@ -1451,23 +1528,25 @@ def run_interactive_shell(
         print(f"Profile: {bold}{profile}{reset}")
         print(f"Lead Node: {bold}{agent_choice}{reset}")
         print("\nSaving configuration...")
-        animate_status_loading("Injecting preferences into PersonaManager")
+        with KineticSpinner("Injecting preferences into PersonaManager"):
+            # Mocking actual save delay
+            time.sleep(1.0)
 
         print(f"✅ {bold}LFG.{reset} Terminal ready.")
         print()
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=20)
     def handle_spy0dte() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"🎯 {bold}Zero-Day War Room: Volatility Sniper{reset}")
         print("═" * 60)
         
-        animate_status_loading("Probing Zero-Day flows and Intelligence Team bias")
-        
-        # Pull data from MCP
-        h = persona.get_heuristics()
-        t_intel = persona.get_intel_module("narrative")
+        with KineticSpinner("Probing Zero-Day flows and Intelligence Team bias"):
+            # Pull data from MCP
+            h = persona.get_heuristics()
+            t_intel = persona.get_intel_module("narrative")
         
         # 1. Gamma & Vanna Levels
         gamma = h.get("gamma_exposure", 0.45) if h else 0.45
@@ -1493,6 +1572,7 @@ def run_interactive_shell(
         input("💎 Press [Enter] to return to the desk > ")
         print()
 
+    @with_resilience(timeout=30)
     def handle_forge() -> None:
         print("════════════════════════════════════════════════════════════")
         print(f"⚒️ {bold}Strategy Forge: Model Calibration & Tweak{reset}")
@@ -1533,8 +1613,8 @@ def run_interactive_shell(
             
             try:
                 val_float = float(new_val)
-                animate_status_loading(f"Pushing {protocol_key}={val_float} to Strategy Oven")
-                res = persona.update_intel_knob(protocol_key, val_float)
+                with KineticSpinner(f"Pushing {protocol_key}={val_float} to Strategy Oven"):
+                    res = persona.update_intel_knob(protocol_key, val_float)
                 
                 if res and not res.get("error"):
                     print(f"✅ {protocol_key} successfully calibrated.")
@@ -1583,6 +1663,10 @@ def run_interactive_shell(
                 
                 print("\n" + "─" * 60)
                 print(f"{grey}Refreshing in 30s...{reset}")
+                
+                if not sys.stdin.isatty():
+                    break # Exit loop immediately in non-interactive mode
+                    
                 time.sleep(30)
                 
         except KeyboardInterrupt:
@@ -1636,6 +1720,15 @@ def run_interactive_shell(
             print(line)
         print()
 
+    @with_resilience(timeout=5)
+    def handle_stresstest() -> None:
+        print("════════════════════════════════════════════════════════════")
+        print(f"🔥 {bold}Resilience Stress Test{reset}")
+        print("Simulating a stalled network call (10s delay)...")
+        with KineticSpinner("Syncing with slow intelligence node"):
+            time.sleep(10)
+        print("✅ Stress test completed (should have timed out and retried).")
+
     handlers: dict[str, Callable[[], None]] = {
         "/commands": handle_commands,
         "/viewall": handle_viewall,
@@ -1644,6 +1737,9 @@ def run_interactive_shell(
         "/refresh": handle_refresh,
         "/buildagent": handle_buildagent,
         "/intel": handle_intel,
+        "/jensen": handle_jensen,
+        "/trumptracker": handle_trumptracker,
+        "/stresstest": handle_stresstest,
         "/todaysupdate": handle_todaysupdate,
         "/analyze": handle_analyze,
         "/marketrecap": handle_marketrecap,
@@ -1707,6 +1803,10 @@ def run_interactive_shell(
     sys.stdout.flush()
 
     while True:
+        # Re-render persistent banner (v0.2.5)
+        # sys.stdout.write('\033[H') # Move to top without clearing? No, that messes up scrollback.
+        # Just render before every prompt if requested.
+        
         try:
             # Use high-fidelity prompt from persona
             raw_input = input(persona.get_prompt()).strip()
@@ -1779,10 +1879,9 @@ def main(argv: list[str] | None = None) -> int:
     # 📡 BACKGROUND UPDATE CHECK
     check_for_updates()
     
-    # 🏁 ROBUST PATH RESOLUTION 🏁
-    project_root = Path(__file__).resolve().parents[2]
-    
     # 🧹 KB-SPEED: PRUNE STALE ARTIFACTS
+    # Project root resolution for standalone binary execution
+    project_root = Path(__file__).resolve().parents[2]
     GarbageCollector.prune(project_root / "outputs")
     
     config_path = Path(args.config)
@@ -1798,12 +1897,13 @@ def main(argv: list[str] | None = None) -> int:
             args.bridge_config = str(resolved)
 
     interactive_mode = (
-        sys.stdin.isatty()
-        and sys.stdout.isatty()
-        and not args.analyze_only
+        (sys.stdin.isatty() and sys.stdout.isatty()) or args.force_interactive
+    ) and (
+        not args.analyze_only
         and not args.analyze_then_hand_off
-        and not args.verify_bridge
+        and not args.mode == "boot"
     )
+
 
     try:
         bridge_config = load_public_bridge_config(Path(args.bridge_config))
@@ -1843,8 +1943,15 @@ def main(argv: list[str] | None = None) -> int:
             render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed)
             print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
             print_bridge_verification(verification.notes)
-            result = run_pipeline(args.config, args.output_dir)
-            print_analysis_summary(result)
+            
+            # Load sniper cart for boot mode (v0.3.7)
+            boot_tickers = load_active_state()
+            result = run_pipeline(args.config, args.output_dir, extra_symbols=boot_tickers)
+            
+            # Analyze the last sniper ticker by default
+            target = boot_tickers[-1] if boot_tickers else None
+            print_analysis_summary(result, target_symbol=target)
+            
             if not verification.compatible:
                 print("Private ALGO bridge is not compatible. Boot stopped before private commands.")
                 return 1
@@ -1877,7 +1984,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # Initialize the Ghost Persona
         persona = PersonaManager(Path(bridge_config.private_algo.repo_path) if verification.compatible else None)
-        play_alert("Diamond Hands system online. Ready to ship.")
+        play_alert("Diamond Hands")
 
         if interactive_mode:
             return run_interactive_shell(args, bridge_config, verification, bridge_status_note, persona=persona)
@@ -1885,8 +1992,14 @@ def main(argv: list[str] | None = None) -> int:
         render_banner(verification.compatible, bridge_config.robinhood.onboarding_completed, persona=persona)
         print_robinhood_onboarding(bridge_config.robinhood.mcp_url, bridge_config.robinhood.onboarding_completed)
         print_bridge_verification(verification.notes)
-        result = run_pipeline(args.config, args.output_dir)
-        print_analysis_summary(result, persona=persona)
+        
+        # Load sniper cart for one-shot mode (v0.3.7)
+        one_shot_tickers = load_active_state()
+        result = run_pipeline(args.config, args.output_dir, extra_symbols=one_shot_tickers)
+        
+        # Analyze the last sniper ticker by default if it exists
+        target = one_shot_tickers[-1] if one_shot_tickers else None
+        print_analysis_summary(result, target_symbol=target, persona=persona)
 
         if args.analyze_then_hand_off:
             if not verification.compatible:

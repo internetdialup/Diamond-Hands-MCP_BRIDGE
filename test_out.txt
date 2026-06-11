@@ -1,0 +1,49 @@
+
+    ____  __  __ _   _ ____  _   _ _   _ ____   _____
+   / __ \/  |/  / | / / __ \/ / / / | / / __ \ / ___/
+  / / / / /|_/ /  |/ / / / / /_/ /  |/ / / / / \__ \ 
+ / /_/ / /  / / /|  / /_/ / __  / /|  / /_/ / ___/ / 
+/_____/_/  /_/_/ |_/_____/_/ /_/_/ |_/_____//____/  
+
+[1m  BY: INTERNETDIALUP 🐙[0m
+[38;2;140;225;255m  ────────────────────────────────────────────────────────[0m
+         💎🤝
+[38;2;0;180;255m  🐙 dmndhnds.app / dmndhnds.lol[0m
+
+  A HFT Mini C++ Bloomberg Terminal for algorithmic execution.
+  [1m[32m⚡️ Making decisions faster than humanly possible[0m
+  [33m⚠️ NOT FINANCIAL ADVICE · use at own RISK ⚠️[0m
+  [32;5m●[0m [32mconnected to your private ALGO repo[0m
+  [32m🍃 connected to Robinhood MCP Bridge[0m
+  [38;2;0;180;255m📦 version: v0.3.0[0m
+
+Robinhood Agentic Trading
+- MCP URL: https://agent.robinhood.com/mcp/trading
+- Codex CLI: codex mcp add robinhood-trading --url https://agent.robinhood.com/mcp/trading
+- Codex app: Settings -> MCP servers -> Streamable HTTP -> add the MCP URL
+- Robinhood uses a dedicated agentic trading account with activity monitoring and a kill switch.
+- Onboarding recorded: yes
+
+Private Bridge Verification
+- Private ALGO repo found at /Users/matthewstenquist/Documents/Documents - Matthew’s Laptop/Git/Trading-MCP-Algo
+- Private ALGO trading-algo CLI detected.
+- Private ALGO bridge config detected.
+- Private ALGO pyproject.toml detected.
+- Private ALGO src/trading_algo package detected.
+- Bridge compatibility check passed (Found Repo + Specs).
+- Private ALGO probe successful (v0.17.7, mode=strict)
+
+════════════════════════════════════════════════════════════════════════════════════
+  [1m💎 DEEP ANALYSIS: QQQ[0m
+  Regime: Risk Off        │ Confidence: 24%
+  Setup : trend_breakdown │ Posture   : Heavy Distribution
+  ──────────────────────────────────────────────────────────────────────────────────
+  [1m├────────────────────────────────── GREEK LEVELS ──────────────────────────────────┤[0m
+  │ [1mGamma EX[0m   │ [33m█████░░░░░░░[0m (-0.09) │ [1mDelta EX[0m   │ [32m█████████░░░[0m (+0.50) │
+  │ [1mVanna EX[0m   │ [33m██████░░░░░░[0m (+0.00) │ [1mDealer Bias[0m│ [33mFRAGILE        [0m   │
+  [1m└──────────────────────────────────────────────────────────────────────────────────┘[0m
+  [90mIntelligence Team: No specific narrative context for this ticker.[0m
+────────────────────────────────────────────────────────────────────────────────────
+════════════════════════════════════════════════════════════════════════════════════
+
+Public bridge run completed. Use --analyze-then-hand-off to push the fresh artifact into your private Diamond-Hands-Algo repo.

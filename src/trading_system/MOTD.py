@@ -18,6 +18,6 @@ BYLINE = "  🐙 dmndhnds.app / dmndhnds.lol"
 DIVIDER = "  ────────────────────────────────────────────────────────"
 
 # Taglines & Disclaimers
-TAGLINE = "  HFT Mini Bloomberg Terminal for retail-first algorithmic execution."
+TAGLINE = "  A HFT Mini C++ Bloomberg Terminal for algorithmic execution."
 MANAGER_TAG_RAW = "⚡️ Making decisions faster than humanly possible"
 DISCLAIMER_RAW = "⚠️ NOT FINANCIAL ADVICE · use at own RISK ⚠️"

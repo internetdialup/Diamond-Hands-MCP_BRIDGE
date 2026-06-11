@@ -4,8 +4,10 @@ import time
 import random
 import re
 import subprocess
+import threading
+from functools import wraps
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Any
 
 if TYPE_CHECKING:
     from trading_system.pipeline.daily import PipelineResult
@@ -59,8 +61,9 @@ def get_tomorrow_schedule() -> tuple[list[str], list[str], str]:
     now = datetime.utcnow()
     tomorrow = now + timedelta(days=1)
     day_name = tomorrow.strftime("%A")
-    events = ["Consumer Sentiment"] if day_name == "Friday" else ["Market Prep"]
-    earnings = ["$TSLA"] if day_name == "Monday" else ["none"]
+    # --- Refined Economy/Earnings Lane (v0.2.5) ---
+    events = ["Consumer Sentiment"] if day_name == "Friday" else []
+    earnings = ["$TSLA"] if day_name == "Monday" else []
     return events, earnings, day_name
 
 def play_alert(message: str) -> None:
@@ -71,28 +74,87 @@ def play_alert(message: str) -> None:
         except Exception: 
             pass
 
-def animate_status_loading(message: str, duration: float = 1.0, voice: bool = False) -> None:
-    if voice:
-        play_alert(message)
-    if not sys.stdout.isatty():
-        print(f"💎 {message}...")
-        return
-    chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    bold, reset, cyan, green = "\033[1m", "\033[0m", "\033[36m", "\033[32m"
-    end_time = time.time() + duration
-    i = 0
-    while time.time() < end_time:
-        sys.stdout.write(f"\r  {cyan}{chars[i % len(chars)]}{reset} {bold}{message}...{reset}")
-        sys.stdout.flush()
-        time.sleep(0.08)
-        i += 1
-    sys.stdout.write(f"\r  {green}✅{reset} {bold}{message} done.{reset}\n")
-    sys.stdout.flush()
+class KineticSpinner:
+    """A threaded context manager for buttery smooth kinetic animations (v0.3.0)."""
+    def __init__(self, label: str, voice: bool = False):
+        self.label = label
+        self.voice = voice
+        self.stop_event = threading.Event()
+        self.thread = None
+        self.frames = ["∙∙∙", "●∙∙", "∙●∙", "∙∙●", "∙●∙"]
+        self.cyan = "\033[38;2;0;180;255m"
+        self.green = "\033[32m"
+        self.reset = "\033[0m"
+        self.bold = "\033[1m"
+
+    def _spin(self):
+        i = 0
+        while not self.stop_event.is_set():
+            frame = self.frames[i % len(self.frames)]
+            sys.stdout.write(f"\r  {self.cyan}💎{self.reset} {self.label} {self.cyan}{frame}{self.reset}")
+            sys.stdout.flush()
+            time.sleep(0.08)
+            i += 1
+
+    def __enter__(self):
+        if self.voice:
+            play_alert(self.label)
+        if sys.stdout.isatty():
+            self.thread = threading.Thread(target=self._spin, daemon=True)
+            self.thread.start()
+        else:
+            print(f"💎 {self.label}...")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join(timeout=0.1)
+        if sys.stdout.isatty():
+            if exc_type:
+                sys.stdout.write(f"\r  \033[31m❌ {self.label} failed.\033[0m{' ' * 20}\n")
+            else:
+                sys.stdout.write(f"\r  {self.green}✅ {self.label} done.{self.reset}{' ' * 20}\n")
+            sys.stdout.flush()
+
+def with_resilience(timeout: float = 15.0, retries: int = 2):
+    """Universal timeout & retry wrapper for high-fidelity command execution."""
+    def decorator(func: Callable):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_err = None
+            for attempt in range(retries + 1):
+                try:
+                    # sys.stdout.write(f"\n  [DEBUG] Resilience: Attempt {attempt+1}...\n")
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(func, *args, **kwargs)
+                        return future.result(timeout=timeout)
+                except concurrent.futures.TimeoutError:
+                    if attempt < retries:
+                        print(f"\n  \033[33m⚠️  Connection stalled. Retrying... ({attempt+1}/{retries})\033[0m")
+                        time.sleep(1.0)
+                    last_err = "Command timed out."
+                except Exception as e:
+                    if attempt < retries:
+                        print(f"\n  \033[33m⚠️  Execution error. Retrying... ({attempt+1}/{retries})\033[0m")
+                        time.sleep(1.0)
+                    last_err = str(e)
+            
+            print(f"\n  \033[31m❌ Sorry, we cannot complete this directive right now: {last_err}\033[0m")
+            return None
+        return wrapper
+    return decorator
+
+def animate_status_loading(label: str, duration: float = 1.0, voice: bool = False) -> None:
+    """Legacy wrapper for the new KineticSpinner."""
+    with KineticSpinner(label, voice=voice):
+        time.sleep(duration)
 
 def get_heartbeat_frame() -> str:
-    """Returns a pulsing frame for the CLI heartbeat."""
-    frames = ["❤️ ", "💖", "💗", "💓", "💞"]
-    return frames[int(time.time() * 2) % len(frames)]
+    """Returns a pulsing frame for the CLI heartbeat using Jules's dots."""
+    frames = ["∙∙∙", "●∙∙", "∙●∙", "∙∙●", "∙●∙"]
+    return frames[int(time.time() * 4) % len(frames)]
 
 def render_error_badge(error: dict) -> str:
     """Renders a beautiful status badge for structured errors (MIT pattern)."""
@@ -176,6 +238,70 @@ def render_command_table(command_specs: list[CommandSpec], title: str) -> list[s
     lines = [f"{bold}{title}{reset}", f"{'Command'.ljust(w)}  Purpose", f"{'-' * w}  {'-' * 38}"]
     for spec in command_specs: lines.append(f"{spec.command.ljust(w)}  {spec.purpose}")
     return lines
+
+def animate_diamond_hands() -> None:
+    """A high-fidelity ASCII diamond animation using the 'V' character."""
+    if not sys.stdout.isatty():
+        return
+
+    # Clear screen for cinematic entry
+    sys.stdout.write("\033[H\033[J")
+    
+    cyan = "\033[38;2;0;180;255m"
+    reset = "\033[0m"
+    bold = "\033[1m"
+    
+    # Diamond construction frames using 'V'
+    frames = [
+        # Frame 0: The spark
+        ["\n" * 5, "         V         "],
+        
+        # Frame 1: Opening
+        ["\n" * 4, "        V V        ", "         V         "],
+        
+        # Frame 2: Building
+        ["\n" * 3, "       V   V       ", "      V     V      ", "       V   V       ", "         V         "],
+        
+        # Frame 3: Diamond Hands Ethos
+        [
+            "\n" * 2,
+            "         V         ",
+            "       V   V       ",
+            "     V       V     ",
+            "   V           V   ",
+            "     V       V     ",
+            "       V   V       ",
+            "         V         "
+        ],
+        
+        # Frame 4: Solidifying
+        [
+            "\n" * 1,
+            "         V         ",
+            "       V V V       ",
+            "     V V V V V     ",
+            "   V V V V V V V   ",
+            "     V V V V V     ",
+            "       V V V       ",
+            "         V         "
+        ]
+    ]
+
+    for frame in frames:
+        sys.stdout.write("\033[H")
+        for line in frame:
+            # Center the lines roughly in a standard 80-char terminal
+            padding = " " * 25
+            sys.stdout.write(padding + cyan + line + reset + "\n")
+        sys.stdout.flush()
+        time.sleep(0.15)
+
+    # Hold the final diamond for a beat
+    time.sleep(0.3)
+    
+    # Clear for banner entry
+    sys.stdout.write('\033[H\033[J')
+    sys.stdout.flush()
 
 def print_intro_command_table(connected: bool = False, core_specs: list[CommandSpec] = None, private_specs: list[CommandSpec] = None) -> None:
     bold, reset = "\033[1m", "\033[0m"
@@ -351,39 +477,51 @@ def print_today_status(result: PipelineResult, tracked_tickers: list[str] = None
     print(f"{grey}╟──────────────────────────────────────────────────────────────────────────────────╢{reset}")
     print(f"{grey}║{reset}  {bold}{green}📰 MACRO CATALYSTS{reset}{' ':<61} {grey}║{reset}")
     
-    # --- Deduplicate News Symbols ---
+    # --- Deduplicate News Symbols (v0.2.5 fix) ---
     news_seen = set()
     news_count = 0
-    for news in report.top_12_news:
+    # Prioritize non-empty topics and summaries
+    valid_news = [n for n in report.top_12_news if n.topic and n.summary]
+    for news in valid_news:
         if news_count >= 5: break
-        if news.topic in news_seen: continue
-        news_seen.add(news.topic)
+        # Deduplicate by ticker/topic
+        ticker_match = re.search(r'\$?([A-Z]{1,5})', news.topic)
+        ticker = ticker_match.group(1).upper() if ticker_match else news.topic[:8].upper()
+
+        if ticker in news_seen: continue
+        news_seen.add(ticker)
         news_count += 1
-        
+
         topic, summary = news.topic[:8], news.summary[:65] if len(news.summary) <= 65 else news.summary[:62] + "..."
         line = f" • {bold}{topic:<8}{reset} │ {summary}"
         padding = 80 - len(strip_ansi(line))
         print(f"{grey}║{reset}  {line}{' ' * max(0, padding)} {grey}║{reset}")
+
+    # Fill empty rows if no news
+    for _ in range(5 - news_count):
+        empty_line = " " * 80
+        print(f"{grey}║{reset}  {empty_line} {grey}║{reset}")
+
         
     events, earnings, day_name = get_tomorrow_schedule()
     print(f"{grey}║{reset}{' ':<82}{grey}║{reset}")
     print(f"{grey}║{reset}  {bold}{pink}📅 EXPECTED TOMORROW ({day_name.upper()}){reset}{' ' * (80 - len(strip_ansi(f'📅 EXPECTED TOMORROW ({day_name.upper()})')))} {grey}║{reset}")
     
     # --- Refine ECONOMY Lane (Phase 16.C logic) ---
-    econ_line = f" • {bold}ECONOMY {reset} │ {', '.join(events)[:65]}"
+    econ_val = ', '.join(events) if events else "none"
+    econ_line = f" • {bold}ECONOMY {reset} │ {econ_val[:65]}"
     padding = 80 - len(strip_ansi(econ_line))
     print(f"{grey}║{reset}  {econ_line}{' ' * max(0, padding)} {grey}║{reset}")
     
-    if earnings and earnings[0].lower() != "none":
+    # --- Refine EARNINGS Lane ---
+    if earnings and earnings[0].lower() != "none" and earnings[0] != "":
         disp_earn = ", ".join(earnings[:5]) + (" …" if len(earnings) > 5 else "")
-        earn_line = f" • {bold}EARN    {reset} │ {disp_earn[:65]}"
-        padding = 80 - len(strip_ansi(earn_line))
-        print(f"{grey}║{reset}  {earn_line}{' ' * max(0, padding)} {grey}║{reset}")
+        earn_line = f" • {bold}EARNINGS{reset} │ {disp_earn[:65]}"
     else:
-        # Static row for zero earnings
-        none_line = f" • {bold}EARN    {reset} │ none"
-        padding = 80 - len(strip_ansi(none_line))
-        print(f"{grey}║{reset}  {none_line}{' ' * max(0, padding)} {grey}║{reset}")
+        earn_line = f" • {bold}EARNINGS{reset} │ none"
+        
+    padding = 80 - len(strip_ansi(earn_line))
+    print(f"{grey}║{reset}  {earn_line}{' ' * max(0, padding)} {grey}║{reset}")
         
     print(f"{grey}╚══════════════════════════════════════════════════════════════════════════════════╝{reset}\n")
 
